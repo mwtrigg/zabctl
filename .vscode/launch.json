@@ -1,0 +1,49 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "zabctl get hosts",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "zabctl.cli",
+      "args": ["get", "hosts", "--output", "json"],
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "zabctl auth status",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "zabctl.cli",
+      "args": ["auth", "status"],
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "zabctl llm capabilities",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "zabctl.cli",
+      "args": ["llm", "capabilities"],
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "zabctl (custom args)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "zabctl.cli",
+      "args": ["${input:cliArgs}"],
+      "console": "integratedTerminal",
+      "justMyCode": true
+    }
+  ],
+  "inputs": [
+    {
+      "id": "cliArgs",
+      "type": "promptString",
+      "description": "zabctl arguments (space separated)",
+      "default": "get hosts --output json"
+    }
+  ]
+}

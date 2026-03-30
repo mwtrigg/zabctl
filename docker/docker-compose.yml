@@ -1,0 +1,133 @@
+---
+# Zabbix 7.0 LTS local dev stack
+# Four containers: postgres, zabbix-server-pgsql, zabbix-web-nginx-pgsql, zabbix-agent2
+#
+# Credentials are loaded from docker/.env (gitignored).
+# Copy docker/.env.example to docker/.env and fill in values before running.
+#
+# Usage:
+#   docker compose -f docker/docker-compose.yml up -d
+#   docker compose -f docker/docker-compose.yml down -v   # tear down + wipe volumes
+
+networks:
+  zbx_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  zabbix_snmptraps:
+
+services:
+
+  # --------------------------------------------------------------------------
+  # PostgreSQL 16
+  # --------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: zbx_postgres
+    restart: unless-stopped
+    networks:
+      - zbx_net
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-zabbix}
+      POSTGRES_USER: ${POSTGRES_USER:-zabbix}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?postgres password required — set POSTGRES_PASSWORD in docker/.env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-zabbix} -d ${POSTGRES_DB:-zabbix}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # --------------------------------------------------------------------------
+  # Zabbix Server (PostgreSQL backend)
+  # --------------------------------------------------------------------------
+  zabbix-server:
+    image: zabbix/zabbix-server-pgsql:alpine-7.0-latest
+    container_name: zbx_server
+    restart: unless-stopped
+    networks:
+      - zbx_net
+    ports:
+      - "10051:10051"
+    environment:
+      DB_SERVER_HOST: postgres
+      DB_SERVER_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-zabbix}
+      POSTGRES_USER: ${POSTGRES_USER:-zabbix}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?postgres password required}
+      ZBX_STARTPOLLERS: 5
+      ZBX_STARTPINGERS: 1
+      ZBX_STARTDISCOVERERS: 1
+      ZBX_STARTTRAPPERS: 5
+      ZBX_TIMEOUT: 4
+      ZBX_DEBUGLEVEL: 3
+    volumes:
+      - zabbix_snmptraps:/var/lib/zabbix/snmptraps
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "zabbix_server -R config_cache_reload 2>/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # --------------------------------------------------------------------------
+  # Zabbix Web (nginx + PostgreSQL)
+  # --------------------------------------------------------------------------
+  zabbix-web:
+    image: zabbix/zabbix-web-nginx-pgsql:alpine-7.0-latest
+    container_name: zbx_web
+    restart: unless-stopped
+    networks:
+      - zbx_net
+    ports:
+      - "8080:8080"
+    environment:
+      ZBX_SERVER_HOST: zabbix-server
+      ZBX_SERVER_PORT: 10051
+      DB_SERVER_HOST: postgres
+      DB_SERVER_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-zabbix}
+      POSTGRES_USER: ${POSTGRES_USER:-zabbix}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?postgres password required}
+      PHP_TZ: ${PHP_TZ:-UTC}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      zabbix-server:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8080/ping || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # --------------------------------------------------------------------------
+  # Zabbix Agent 2 (monitors the server host itself)
+  # --------------------------------------------------------------------------
+  zabbix-agent2:
+    image: zabbix/zabbix-agent2:alpine-7.0-latest
+    container_name: zbx_agent2
+    restart: unless-stopped
+    networks:
+      - zbx_net
+    ports:
+      - "10050:10050"
+    environment:
+      ZBX_HOSTNAME: zbx-dev-host
+      ZBX_SERVER_HOST: zabbix-server
+      ZBX_SERVER_PORT: 10051
+      ZBX_PASSIVE_ALLOW_LIST: "0.0.0.0/0"
+      ZBX_ACTIVE_ALLOW_LIST: "0.0.0.0/0"
+    depends_on:
+      - zabbix-server
+    privileged: true
+    pid: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
