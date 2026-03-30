@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import os
 import sys
-import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -184,10 +183,6 @@ def load_config(
 
     # --- Warn on plaintext password in config file ---
     if _str_or_none(file_cfg.get("password")):
-        warnings.warn(
-            "plaintext password detected in config file — use api_token instead",
-            stacklevel=2,
-        )
         print(
             "warning: plaintext password in config file — use api_token instead",
             file=sys.stderr,

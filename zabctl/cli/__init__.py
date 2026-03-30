@@ -62,7 +62,7 @@ from .llm import llm
 @click.option(
     "--insecure",
     is_flag=True,
-    default=None,
+    default=False,
     envvar="ZABCTL_INSECURE",
     help="Skip TLS certificate verification (unsafe — dev only).",
 )

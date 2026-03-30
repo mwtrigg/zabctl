@@ -1,4 +1,4 @@
-"""Zabbix host group resource — Phase 0 stub."""
+"""Zabbix host group resource."""
 
 from __future__ import annotations
 
@@ -10,5 +10,12 @@ from zabctl.api.client import ZabbixClient
 def get_groups(
     client: ZabbixClient,
 ) -> list[dict[str, Any]]:
-    """Return host groups. Stub: not yet implemented."""
-    raise NotImplementedError("groups.get_groups() — Phase 0 stub")
+    """Return host groups."""
+    result: list[dict[str, Any]] = client.call(
+        "hostgroup.get",
+        {
+            "output": ["groupid", "name"],
+            "sortfield": "name",
+        },
+    )
+    return result
