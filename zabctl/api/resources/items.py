@@ -11,6 +11,13 @@ _ITEM_OUTPUT = ["itemid", "hostid", "key_", "name", "lastvalue", "lastclock", "u
 _STATUS_MAP = {"enabled": "0", "disabled": "1"}
 
 
+def _parse_sort(sort_by: str) -> tuple[str, str]:
+    if ":" in sort_by:
+        field, order = sort_by.rsplit(":", 1)
+        return field, order.upper()
+    return sort_by, "ASC"
+
+
 def _host_ids(client: ZabbixClient, host: str) -> list[str]:
     """Resolve a hostname to a list of hostids."""
     result: list[dict[str, Any]] = client.call(
@@ -27,6 +34,9 @@ def get_items(
     key: str | None = None,
     item_type: str | None = None,
     status: str | None = None,
+    limit: int | None = None,
+    sort_by: str | None = None,
+    extra_params: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Return items for a host."""
     params: dict[str, Any] = {
@@ -44,6 +54,17 @@ def get_items(
     if status:
         params.setdefault("filter", {})
         params["filter"]["status"] = _STATUS_MAP.get(status, status)
+
+    if limit is not None:
+        params["limit"] = limit
+
+    if sort_by:
+        field, order = _parse_sort(sort_by)
+        params["sortfield"] = field
+        params["sortorder"] = order
+
+    if extra_params:
+        params.update(extra_params)
 
     result: list[dict[str, Any]] = client.call("item.get", params)
     return result

@@ -48,3 +48,5 @@ Thumbs.db
 # Distribution artifacts
 *.whl
 *.tar.gz
+.trigg/
+.gitignore

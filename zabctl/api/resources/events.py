@@ -27,6 +27,13 @@ def _parse_time(value: str) -> int:
     raise ValueError(f"Cannot parse time: {value!r}")
 
 
+def _parse_sort(sort_by: str) -> tuple[str, str]:
+    if ":" in sort_by:
+        field, order = sort_by.rsplit(":", 1)
+        return field, order.upper()
+    return sort_by, "ASC"
+
+
 def get_events(
     client: ZabbixClient,
     *,
@@ -34,6 +41,8 @@ def get_events(
     since: str | None = None,
     until: str | None = None,
     limit: int | None = None,
+    sort_by: str | None = None,
+    extra_params: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Return events."""
     params: dict[str, Any] = {
@@ -56,6 +65,14 @@ def get_events(
 
     if limit:
         params["limit"] = limit
+
+    if sort_by:
+        field, order = _parse_sort(sort_by)
+        params["sortfield"] = field
+        params["sortorder"] = order
+
+    if extra_params:
+        params.update(extra_params)
 
     result: list[dict[str, Any]] = client.call("event.get", params)
     return result

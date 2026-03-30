@@ -7,6 +7,7 @@ and respect the global --output / -o flag from ctx.obj.
 
 from __future__ import annotations
 
+import json
 import sys
 from itertools import islice
 from typing import Any
@@ -21,20 +22,71 @@ from zabctl.api.client import (
     ZabbixNotFoundError,
 )
 from zabctl.api.resources import (
-    alerts,
     events,
     groups,
     hosts,
     items,
+    problems,
     templates,
     triggers,
+    usergroups,
+    users,
 )
 from zabctl.config.loader import ZabctlConfig
 from zabctl.output.formatter import format_error, format_output
 
+# Common option sets reused across commands.
+_PIPELINE_OPTIONS = [
+    click.option("--field", default=None, metavar="PATH", help="Extract one field per record."),
+    click.option("--stdin-field", default=None, metavar="NAME", help="Read values from stdin, map to this field."),
+    click.option("--from-stdin", is_flag=True, default=False, help="Read jsonl records from stdin."),
+    click.option("--batch-size", default=10, show_default=True, help="Batch size for stdin fan-out."),
+]
+
+_OUTPUT_OPTIONS = [
+    click.option("--no-headers", is_flag=True, default=False, help="Suppress table headers."),
+    click.option("--output", "-o", default=None, type=click.Choice(["table", "json", "jsonl", "yaml", "wide"]), help="Output format."),
+]
+
+_PAGINATION_OPTIONS = [
+    click.option("--limit", default=None, type=int, help="Maximum number of records to return."),
+    click.option("--sort-by", default=None, metavar="FIELD[:desc]", help="Sort by field (append :desc for descending)."),
+    click.option(
+        "--filter",
+        "extra_filters",
+        multiple=True,
+        metavar="KEY=VALUE",
+        help="Pass extra key=value params directly to the Zabbix API (repeatable).",
+    ),
+]
+
 
 def _resolve_output(ctx_output: str, local_output: str | None) -> str:
     return local_output or ctx_output or "table"
+
+
+def _resolve(cfg: ZabctlConfig, flag: str, explicit: Any, fallback: Any = None) -> Any:
+    """Return the first non-None value from: explicit CLI flag → config defaults → fallback."""
+    if explicit is not None:
+        return explicit
+    default = cfg.defaults.get(flag)
+    if default is not None:
+        return default
+    return fallback
+
+
+def _parse_extra_filters(extra_filters: tuple[str, ...]) -> dict[str, Any]:
+    """Parse 'key=value' pairs into a dict. Values are JSON-decoded when possible."""
+    result: dict[str, Any] = {}
+    for item in extra_filters:
+        if "=" not in item:
+            raise click.BadParameter(f"--filter must be key=value, got: {item!r}")
+        key, _, raw = item.partition("=")
+        try:
+            result[key.strip()] = json.loads(raw)
+        except json.JSONDecodeError:
+            result[key.strip()] = raw
+    return result
 
 
 def _make_client(cfg: ZabctlConfig) -> ZabbixClient:
@@ -62,7 +114,7 @@ def _handle_api_error(exc: Exception) -> None:
     elif isinstance(exc, httpx.TimeoutException):
         format_error("Request timed out", exit_code=4)
     elif isinstance(exc, ZabbixAPIError):
-        format_error(str(exc), exit_code=1)
+        format_error(f"Zabbix API error {exc.code}: {exc}", exit_code=1)
     else:
         format_error(str(exc), exit_code=1)
 
@@ -93,17 +145,15 @@ def get() -> None:
 
 @get.command("hosts")
 @click.option("--group", default=None, help="Filter by host group name.")
-@click.option(
-    "--status",
-    default=None,
-    type=click.Choice(["monitored", "unmonitored"]),
-    help="Filter by monitoring status.",
-)
+@click.option("--status", default=None, type=click.Choice(["monitored", "unmonitored"]), help="Filter by monitoring status.")
 @click.option("--search", default=None, help="Search string matched against host name.")
 @click.option("--field", default=None, metavar="PATH", help="Extract one field per record.")
 @click.option("--stdin-field", default=None, metavar="NAME", help="Read values from stdin, map to this field.")
 @click.option("--from-stdin", is_flag=True, default=False, help="Read jsonl records from stdin.")
 @click.option("--batch-size", default=10, show_default=True, help="Batch size for stdin fan-out.")
+@click.option("--limit", default=None, type=int, help="Maximum number of records to return.")
+@click.option("--sort-by", default=None, metavar="FIELD[:desc]", help="Sort by field (append :desc for descending).")
+@click.option("--filter", "extra_filters", multiple=True, metavar="KEY=VALUE", help="Extra Zabbix API params (repeatable).")
 @click.option("--no-headers", is_flag=True, default=False, help="Suppress table headers.")
 @click.option("--output", "-o", default=None, type=click.Choice(["table", "json", "jsonl", "yaml", "wide"]), help="Output format.")
 @click.pass_obj
@@ -116,6 +166,9 @@ def get_hosts(
     stdin_field: str | None,
     from_stdin: bool,
     batch_size: int,
+    limit: int | None,
+    sort_by: str | None,
+    extra_filters: tuple[str, ...],
     no_headers: bool,
     output: str | None,
 ) -> None:
@@ -123,7 +176,16 @@ def get_hosts(
     fmt = _resolve_output(cfg.output, output)
     client = _make_client(cfg)
     try:
-        data = hosts.get_hosts(client, group=group, status=status, search=search)
+        extra = _parse_extra_filters(extra_filters)
+        data = hosts.get_hosts(
+            client,
+            group=group,
+            status=status,
+            search=search,
+            limit=_resolve(cfg, "limit", limit),
+            sort_by=_resolve(cfg, "sort_by", sort_by),
+            extra_params=extra or None,
+        )
     except Exception as exc:
         _handle_api_error(exc)
         return
@@ -182,6 +244,9 @@ def get_host(cfg: ZabctlConfig, id_or_name: str, output: str | None, no_headers:
 @click.option("--stdin-field", default=None, metavar="NAME", help="Read values from stdin, map to this field.")
 @click.option("--from-stdin", is_flag=True, default=False, help="Read jsonl records from stdin.")
 @click.option("--batch-size", default=10, show_default=True, help="Batch size for stdin fan-out.")
+@click.option("--limit", default=None, type=int, help="Maximum number of records to return.")
+@click.option("--sort-by", default=None, metavar="FIELD[:desc]", help="Sort by field (append :desc for descending).")
+@click.option("--filter", "extra_filters", multiple=True, metavar="KEY=VALUE", help="Extra Zabbix API params (repeatable).")
 @click.option("--no-headers", is_flag=True, default=False, help="Suppress table headers.")
 @click.option("--output", "-o", default=None, type=click.Choice(["table", "json", "jsonl", "yaml", "wide"]), help="Output format.")
 @click.pass_obj
@@ -195,6 +260,9 @@ def get_items(
     stdin_field: str | None,
     from_stdin: bool,
     batch_size: int,
+    limit: int | None,
+    sort_by: str | None,
+    extra_filters: tuple[str, ...],
     no_headers: bool,
     output: str | None,
 ) -> None:
@@ -207,11 +275,25 @@ def get_items(
         format_error("Provide a host argument or pipe hostnames via --stdin-field host", exit_code=5)
         return
 
+    extra = _parse_extra_filters(extra_filters)
+    resolved_limit = _resolve(cfg, "limit", limit)
+    resolved_sort = _resolve(cfg, "sort_by", sort_by)
     all_data: list[dict[str, Any]] = []
     for batch in _batched(hostnames, batch_size):
         for h in batch:
             try:
-                all_data.extend(items.get_items(client, h, key=key, item_type=item_type, status=status))
+                all_data.extend(
+                    items.get_items(
+                        client,
+                        h,
+                        key=key,
+                        item_type=item_type,
+                        status=status,
+                        limit=resolved_limit,
+                        sort_by=resolved_sort,
+                        extra_params=extra or None,
+                    )
+                )
             except Exception as exc:
                 _handle_api_error(exc)
                 return
@@ -241,6 +323,9 @@ def get_items(
 @click.option("--stdin-field", default=None, metavar="NAME", help="Read values from stdin, map to this field.")
 @click.option("--from-stdin", is_flag=True, default=False, help="Read jsonl records from stdin.")
 @click.option("--batch-size", default=10, show_default=True, help="Batch size for stdin fan-out.")
+@click.option("--limit", default=None, type=int, help="Maximum number of records to return.")
+@click.option("--sort-by", default=None, metavar="FIELD[:desc]", help="Sort by field (append :desc for descending).")
+@click.option("--filter", "extra_filters", multiple=True, metavar="KEY=VALUE", help="Extra Zabbix API params (repeatable).")
 @click.option("--no-headers", is_flag=True, default=False, help="Suppress table headers.")
 @click.option("--output", "-o", default=None, type=click.Choice(["table", "json", "jsonl", "yaml", "wide"]), help="Output format.")
 @click.pass_obj
@@ -253,6 +338,9 @@ def get_triggers(
     stdin_field: str | None,
     from_stdin: bool,
     batch_size: int,
+    limit: int | None,
+    sort_by: str | None,
+    extra_filters: tuple[str, ...],
     no_headers: bool,
     output: str | None,
 ) -> None:
@@ -260,7 +348,16 @@ def get_triggers(
     fmt = _resolve_output(cfg.output, output)
     client = _make_client(cfg)
     try:
-        data = triggers.get_triggers(client, severity=severity, host=host, status=status)
+        extra = _parse_extra_filters(extra_filters)
+        data = triggers.get_triggers(
+            client,
+            severity=severity,
+            host=host,
+            status=status,
+            limit=_resolve(cfg, "limit", limit),
+            sort_by=_resolve(cfg, "sort_by", sort_by),
+            extra_params=extra or None,
+        )
     except Exception as exc:
         _handle_api_error(exc)
         return
@@ -281,19 +378,22 @@ def get_triggers(
 # get alerts
 # ---------------------------------------------------------------------------
 
-@get.command("alerts")
+@get.command("problems")
 @click.option("--severity", default=None, help="Filter by severity (name or 0–5).")
 @click.option("--host", default=None, help="Filter by host name.")
-@click.option("--since", default=None, help="Show alerts since this time (ISO 8601 or Unix epoch).")
-@click.option("--acknowledged", is_flag=True, default=False, help="Include only acknowledged alerts.")
+@click.option("--since", default=None, help="Show problems since this time (ISO 8601 or Unix epoch).")
+@click.option("--acknowledged", is_flag=True, default=False, help="Show only acknowledged problems (default: show all).")
 @click.option("--field", default=None, metavar="PATH", help="Extract one field per record.")
 @click.option("--stdin-field", default=None, metavar="NAME", help="Read values from stdin, map to this field.")
 @click.option("--from-stdin", is_flag=True, default=False, help="Read jsonl records from stdin.")
 @click.option("--batch-size", default=10, show_default=True, help="Batch size for stdin fan-out.")
+@click.option("--limit", default=None, type=int, help="Maximum number of records to return.")
+@click.option("--sort-by", default=None, metavar="FIELD[:desc]", help="Sort by field (append :desc for descending).")
+@click.option("--filter", "extra_filters", multiple=True, metavar="KEY=VALUE", help="Extra Zabbix API params (repeatable).")
 @click.option("--no-headers", is_flag=True, default=False, help="Suppress table headers.")
 @click.option("--output", "-o", default=None, type=click.Choice(["table", "json", "jsonl", "yaml", "wide"]), help="Output format.")
 @click.pass_obj
-def get_alerts(
+def get_problems(
     cfg: ZabctlConfig,
     severity: str | None,
     host: str | None,
@@ -303,26 +403,39 @@ def get_alerts(
     stdin_field: str | None,
     from_stdin: bool,
     batch_size: int,
+    limit: int | None,
+    sort_by: str | None,
+    extra_filters: tuple[str, ...],
     no_headers: bool,
     output: str | None,
 ) -> None:
-    """List active alerts (Zabbix problems)."""
+    """List active problems (Zabbix problems API)."""
     fmt = _resolve_output(cfg.output, output)
     client = _make_client(cfg)
     ack: bool | None = True if acknowledged else None
     try:
-        data = alerts.get_alerts(client, severity=severity, host=host, since=since, acknowledged=ack)
+        extra = _parse_extra_filters(extra_filters)
+        data = problems.get_alerts(
+            client,
+            severity=severity,
+            host=host,
+            since=since,
+            acknowledged=ack,
+            limit=_resolve(cfg, "limit", limit),
+            sort_by=_resolve(cfg, "sort_by", sort_by),
+            extra_params=extra or None,
+        )
     except Exception as exc:
         _handle_api_error(exc)
         return
     format_output(
         data=data,
         output_format=fmt,
-        command="get alerts",
+        command="get problems",
         server=cfg.server,
         api_version=client.api_version,
         columns=["eventid", "name", "severity", "clock", "acknowledged"],
-        wide_columns=["objectid", "hosts[0].host"],
+        wide_columns=["objectid", "r_eventid"],
         no_headers=no_headers,
         field=field,
     )
@@ -335,6 +448,9 @@ def get_alerts(
 @get.command("templates")
 @click.option("--search", default=None, help="Search string matched against template name.")
 @click.option("--field", default=None, metavar="PATH", help="Extract one field per record.")
+@click.option("--limit", default=None, type=int, help="Maximum number of records to return.")
+@click.option("--sort-by", default=None, metavar="FIELD[:desc]", help="Sort by field (append :desc for descending).")
+@click.option("--filter", "extra_filters", multiple=True, metavar="KEY=VALUE", help="Extra Zabbix API params (repeatable).")
 @click.option("--no-headers", is_flag=True, default=False, help="Suppress table headers.")
 @click.option("--output", "-o", default=None, type=click.Choice(["table", "json", "jsonl", "yaml", "wide"]), help="Output format.")
 @click.pass_obj
@@ -342,6 +458,9 @@ def get_templates(
     cfg: ZabctlConfig,
     search: str | None,
     field: str | None,
+    limit: int | None,
+    sort_by: str | None,
+    extra_filters: tuple[str, ...],
     no_headers: bool,
     output: str | None,
 ) -> None:
@@ -349,7 +468,14 @@ def get_templates(
     fmt = _resolve_output(cfg.output, output)
     client = _make_client(cfg)
     try:
-        data = templates.get_templates(client, search=search)
+        extra = _parse_extra_filters(extra_filters)
+        data = templates.get_templates(
+            client,
+            search=search,
+            limit=_resolve(cfg, "limit", limit),
+            sort_by=_resolve(cfg, "sort_by", sort_by),
+            extra_params=extra or None,
+        )
     except Exception as exc:
         _handle_api_error(exc)
         return
@@ -452,12 +578,18 @@ def get_latestdata(
 
 @get.command("groups")
 @click.option("--field", default=None, metavar="PATH", help="Extract one field per record.")
+@click.option("--limit", default=None, type=int, help="Maximum number of records to return.")
+@click.option("--sort-by", default=None, metavar="FIELD[:desc]", help="Sort by field (append :desc for descending).")
+@click.option("--filter", "extra_filters", multiple=True, metavar="KEY=VALUE", help="Extra Zabbix API params (repeatable).")
 @click.option("--no-headers", is_flag=True, default=False, help="Suppress table headers.")
 @click.option("--output", "-o", default=None, type=click.Choice(["table", "json", "jsonl", "yaml", "wide"]), help="Output format.")
 @click.pass_obj
 def get_groups(
     cfg: ZabctlConfig,
     field: str | None,
+    limit: int | None,
+    sort_by: str | None,
+    extra_filters: tuple[str, ...],
     no_headers: bool,
     output: str | None,
 ) -> None:
@@ -465,7 +597,13 @@ def get_groups(
     fmt = _resolve_output(cfg.output, output)
     client = _make_client(cfg)
     try:
-        data = groups.get_groups(client)
+        extra = _parse_extra_filters(extra_filters)
+        data = groups.get_groups(
+            client,
+            limit=_resolve(cfg, "limit", limit),
+            sort_by=_resolve(cfg, "sort_by", sort_by),
+            extra_params=extra or None,
+        )
     except Exception as exc:
         _handle_api_error(exc)
         return
@@ -489,7 +627,9 @@ def get_groups(
 @click.option("--host", default=None, help="Filter by host name.")
 @click.option("--since", default=None, help="Show events since this time (ISO 8601 or Unix epoch).")
 @click.option("--until", default=None, help="Show events until this time (ISO 8601 or Unix epoch).")
-@click.option("--limit", default=None, type=int, help="Maximum number of events to return.")
+@click.option("--limit", default=None, type=int, help="Maximum number of records to return.")
+@click.option("--sort-by", default=None, metavar="FIELD[:desc]", help="Sort by field (append :desc for descending).")
+@click.option("--filter", "extra_filters", multiple=True, metavar="KEY=VALUE", help="Extra Zabbix API params (repeatable).")
 @click.option("--field", default=None, metavar="PATH", help="Extract one field per record.")
 @click.option("--no-headers", is_flag=True, default=False, help="Suppress table headers.")
 @click.option("--output", "-o", default=None, type=click.Choice(["table", "json", "jsonl", "yaml", "wide"]), help="Output format.")
@@ -500,6 +640,8 @@ def get_events(
     since: str | None,
     until: str | None,
     limit: int | None,
+    sort_by: str | None,
+    extra_filters: tuple[str, ...],
     field: str | None,
     no_headers: bool,
     output: str | None,
@@ -508,7 +650,16 @@ def get_events(
     fmt = _resolve_output(cfg.output, output)
     client = _make_client(cfg)
     try:
-        data = events.get_events(client, host=host, since=since, until=until, limit=limit)
+        extra = _parse_extra_filters(extra_filters)
+        data = events.get_events(
+            client,
+            host=host,
+            since=since,
+            until=until,
+            limit=_resolve(cfg, "limit", limit),
+            sort_by=_resolve(cfg, "sort_by", sort_by),
+            extra_params=extra or None,
+        )
     except Exception as exc:
         _handle_api_error(exc)
         return
@@ -520,6 +671,132 @@ def get_events(
         api_version=client.api_version,
         columns=["eventid", "clock", "name", "severity", "value"],
         wide_columns=["source", "object", "objectid", "acknowledged"],
+        no_headers=no_headers,
+        field=field,
+    )
+
+
+# ---------------------------------------------------------------------------
+# get users
+# ---------------------------------------------------------------------------
+
+@get.command("users")
+@click.option("--field", default=None, metavar="PATH", help="Extract one field per record.")
+@click.option("--limit", default=None, type=int, help="Maximum number of records to return.")
+@click.option("--sort-by", default=None, metavar="FIELD[:desc]", help="Sort by field (append :desc for descending).")
+@click.option("--filter", "extra_filters", multiple=True, metavar="KEY=VALUE", help="Extra Zabbix API params (repeatable).")
+@click.option("--no-headers", is_flag=True, default=False, help="Suppress table headers.")
+@click.option("--output", "-o", default=None, type=click.Choice(["table", "json", "jsonl", "yaml", "wide"]), help="Output format.")
+@click.pass_obj
+def get_users(
+    cfg: ZabctlConfig,
+    field: str | None,
+    limit: int | None,
+    sort_by: str | None,
+    extra_filters: tuple[str, ...],
+    no_headers: bool,
+    output: str | None,
+) -> None:
+    """List Zabbix users."""
+    fmt = _resolve_output(cfg.output, output)
+    client = _make_client(cfg)
+    try:
+        extra = _parse_extra_filters(extra_filters)
+        data = users.get_users(
+            client,
+            limit=_resolve(cfg, "limit", limit),
+            sort_by=_resolve(cfg, "sort_by", sort_by),
+            extra_params=extra or None,
+        )
+    except Exception as exc:
+        _handle_api_error(exc)
+        return
+    format_output(
+        data=data,
+        output_format=fmt,
+        command="get users",
+        server=cfg.server,
+        api_version=client.api_version,
+        columns=["userid", "username", "name", "surname"],
+        wide_columns=["roleid", "usrgrps[0].name"],
+        no_headers=no_headers,
+        field=field,
+    )
+
+
+# ---------------------------------------------------------------------------
+# get user <id|name>
+# ---------------------------------------------------------------------------
+
+@get.command("user")
+@click.argument("id_or_name")
+@click.option("--output", "-o", default=None, type=click.Choice(["table", "json", "jsonl", "yaml", "wide"]), help="Output format.")
+@click.option("--no-headers", is_flag=True, default=False, help="Suppress table headers.")
+@click.pass_obj
+def get_user(cfg: ZabctlConfig, id_or_name: str, output: str | None, no_headers: bool) -> None:
+    """Show a single Zabbix user by id or username."""
+    fmt = _resolve_output(cfg.output, output)
+    client = _make_client(cfg)
+    try:
+        data = users.get_user(client, id_or_name)
+    except Exception as exc:
+        _handle_api_error(exc)
+        return
+    format_output(
+        data=[data],
+        output_format=fmt,
+        command="get user",
+        server=cfg.server,
+        api_version=client.api_version,
+        columns=["userid", "username", "name", "surname", "roleid"],
+        wide_columns=["usrgrps[0].name"],
+        no_headers=no_headers,
+    )
+
+
+# ---------------------------------------------------------------------------
+# get usergroups
+# ---------------------------------------------------------------------------
+
+@get.command("usergroups")
+@click.option("--field", default=None, metavar="PATH", help="Extract one field per record.")
+@click.option("--limit", default=None, type=int, help="Maximum number of records to return.")
+@click.option("--sort-by", default=None, metavar="FIELD[:desc]", help="Sort by field (append :desc for descending).")
+@click.option("--filter", "extra_filters", multiple=True, metavar="KEY=VALUE", help="Extra Zabbix API params (repeatable).")
+@click.option("--no-headers", is_flag=True, default=False, help="Suppress table headers.")
+@click.option("--output", "-o", default=None, type=click.Choice(["table", "json", "jsonl", "yaml", "wide"]), help="Output format.")
+@click.pass_obj
+def get_usergroups(
+    cfg: ZabctlConfig,
+    field: str | None,
+    limit: int | None,
+    sort_by: str | None,
+    extra_filters: tuple[str, ...],
+    no_headers: bool,
+    output: str | None,
+) -> None:
+    """List Zabbix user groups."""
+    fmt = _resolve_output(cfg.output, output)
+    client = _make_client(cfg)
+    try:
+        extra = _parse_extra_filters(extra_filters)
+        data = usergroups.get_usergroups(
+            client,
+            limit=limit,
+            sort_by=sort_by,
+            extra_params=extra or None,
+        )
+    except Exception as exc:
+        _handle_api_error(exc)
+        return
+    format_output(
+        data=data,
+        output_format=fmt,
+        command="get usergroups",
+        server=cfg.server,
+        api_version=client.api_version,
+        columns=["usrgrpid", "name", "gui_access", "users_status"],
+        wide_columns=["users[0].username"],
         no_headers=no_headers,
         field=field,
     )

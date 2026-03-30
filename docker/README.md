@@ -8,7 +8,7 @@ A minimal Zabbix 7.0 stack for local development and testing of `zabctl`.
 podman compose -f docker/docker-compose.yml up -d
 ```
 
-Wait ~30 seconds for Zabbix to finish initialising before running the seed script.
+Wait ~30 seconds for Zabbix to finish initializing before running the seed script.
 
 ## Seed test data
 

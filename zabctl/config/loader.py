@@ -42,14 +42,23 @@ class ZabctlConfig:
     password: str | None = None
     context_name: str | None = None
     output: str = "table"
+    explain: bool = False
+    defaults: dict[str, object] = field(default_factory=dict)
     tls: TLSConfig = field(default_factory=TLSConfig)
     proxy: ProxyConfig = field(default_factory=ProxyConfig)
 
 
-def _load_config_file(context_name: str | None = None) -> dict[str, object]:
-    """Load the config file and return the active context dict (or empty dict)."""
+def _load_config_file(
+    context_name: str | None = None,
+) -> tuple[dict[str, object], dict[str, object]]:
+    """Load the config file.
+
+    Returns:
+        (context_cfg, global_defaults) where context_cfg is the active context dict
+        and global_defaults is the top-level defaults: block.  Either may be empty.
+    """
     if not CONFIG_PATH.exists():
-        return {}
+        return {}, {}
 
     try:
         raw = yaml.safe_load(CONFIG_PATH.read_text()) or {}
@@ -58,20 +67,24 @@ def _load_config_file(context_name: str | None = None) -> dict[str, object]:
             f"warning: could not parse config file {CONFIG_PATH}: {exc}",
             file=sys.stderr,
         )
-        return {}
+        return {}, {}
+
+    global_defaults: dict[str, object] = raw.get("defaults", {})  # type: ignore[assignment]
+    if not isinstance(global_defaults, dict):
+        global_defaults = {}
 
     contexts: dict[str, object] = raw.get("contexts", {})  # type: ignore[assignment]
     if not isinstance(contexts, dict):
-        return {}
+        return {}, global_defaults
 
     active = context_name or raw.get("current_context")
     if active and active in contexts:
         ctx: dict[str, object] = contexts[active]  # type: ignore[assignment]
         if not isinstance(ctx, dict):
-            return {}
-        return ctx
+            return {}, global_defaults
+        return ctx, global_defaults
 
-    return {}
+    return {}, global_defaults
 
 
 def _str_or_none(val: object) -> str | None:
@@ -88,6 +101,7 @@ def load_config(
     password: str | None = None,
     context_name: str | None = None,
     output: str | None = None,
+    explain: bool = False,
     insecure: bool | None = None,
     ca_bundle: str | None = None,
     client_cert: str | None = None,
@@ -107,7 +121,7 @@ def load_config(
 
     # --- Step 1: config file (lowest priority) ---
     ctx_name_for_file = os.environ.get("ZABCTL_CONTEXT") or context_name
-    file_cfg = _load_config_file(ctx_name_for_file)
+    file_cfg, global_defaults = _load_config_file(ctx_name_for_file)
     file_tls: dict[str, object] = file_cfg.get("tls", {})  # type: ignore[assignment]
     if not isinstance(file_tls, dict):
         file_tls = {}
@@ -120,6 +134,11 @@ def load_config(
     resolved_username = _str_or_none(file_cfg.get("username"))
     resolved_password = _str_or_none(file_cfg.get("password"))
     resolved_output = _str_or_none(file_cfg.get("output")) or "table"
+    # Merge defaults: global first, context-level overrides global.
+    file_defaults: dict[str, object] = file_cfg.get("defaults", {})  # type: ignore[assignment]
+    if not isinstance(file_defaults, dict):
+        file_defaults = {}
+    resolved_defaults: dict[str, object] = {**global_defaults, **file_defaults}
     resolved_insecure = bool(file_tls.get("insecure", False))
     resolved_ca_bundle = _str_or_none(file_tls.get("ca_bundle"))
     resolved_client_cert = _str_or_none(file_tls.get("client_cert"))
@@ -203,6 +222,8 @@ def load_config(
         password=resolved_password,
         context_name=ctx_name_for_file,
         output=resolved_output,
+        explain=explain,
+        defaults=resolved_defaults,
         tls=TLSConfig(
             insecure=resolved_insecure,
             ca_bundle=resolved_ca_bundle,

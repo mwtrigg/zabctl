@@ -37,17 +37,24 @@ Move items to PHASES.md once they are scoped and committed.
 - [ ] `get latestdata` — confirm which API method: `item.get` with `selectLastValues`? Check API version support.
 - [ ] Host identity — accept both `hostid` (numeric) and `host` (technical name) and `name` (visible name) in commands? Flag or auto-detect?
 - [ ] Timestamp display — Unix epoch vs ISO 8601 in table output? Always ISO in JSON output.
-- [ ] `get alerts` vs `get problems` — Zabbix calls them "problems" internally. Expose as `alerts` for friendliness but document alias.
+- [x] `get alerts` vs `get problems` — ✅ decided: **`get problems`**. Matches Zabbix internal terminology. Renamed in 0.2.0.
 
 ---
 
+## 🟡 Phase 2 Open Items
+
+- [ ] `get host <id|name>` and `get template <id|name>` do not accept piped ids — these single-object commands have `stdin_accepts: null` and will fail silently in pipelines. Add `--from-stdin` support so agents can pipe a list of IDs to them.
+- [ ] `auth status` only outputs table format — a JSON output mode would let agents check auth state programmatically without screen-scraping.
+
+---
+/
 ## 💡 Ideas & Future Features (unscheduled)
 
 ### Output & UX
 - [ ] `--output wide` extra columns — define what "wide" means per resource (e.g., hosts: add IP, agent version, last seen)
 - [ ] `--output jsonl` for streaming large result sets to agent pipelines
 - [ ] Colorized severity levels in table output (red=disaster, orange=high, etc.)
-- [ ] `--watch` polling mode: `zabctl get alerts --watch --interval 30`
+- [ ] `--watch` polling mode: `zabctl get problems --watch --interval 30`
 - [ ] Sparkline graph in terminal for `get latestdata` via Rich
 
 ### Agent / Automation Ergonomics

@@ -1,0 +1,87 @@
+# zabctl configuration file
+# Location: ~/.config/zabctl/config.yaml
+#
+# Resolution order (later overrides earlier):
+#   1. This config file
+#   2. CLI flags (--server, --token, etc.)
+#   3. Environment variables (ZABCTL_SERVER, ZABCTL_API_TOKEN, etc.)
+#
+# Multiple named contexts are supported. Switch with:
+#   zabctl context use <name>
+#   ZABCTL_CONTEXT=<name> zabctl ...
+
+# The context used when no --context flag or ZABCTL_CONTEXT is set.
+current_context: homelab
+
+# Global defaults — apply to all contexts.
+# A context can override individual keys in its own defaults: block.
+# These are overridden by explicit CLI flags (--output, --sort-by, etc.).
+#
+# Supported keys: output, sort_by, limit
+# (any flag name used by `get` commands, with hyphens replaced by underscores)
+defaults:
+  output: table       # preferred output format
+  # sort_by: name     # sort all collection commands by name ascending
+  # limit: 200        # cap all queries at 200 results
+
+contexts:
+
+  # --- Minimal: API token, no TLS customisation ---
+  homelab:
+    server: http://zabbix.homelab/
+    api_token: zbx_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+  # --- Context that overrides the global default output format ---
+  # The global defaults: block applies to all contexts.
+  # Add a context-level defaults: block to override specific keys for that context only.
+  homelab-json:
+    server: http://zabbix.homelab/
+    api_token: zbx_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+    defaults:
+      output: json          # override global default for this context only
+      sort_by: name         # sort all collections by name ascending
+      # limit: 100          # cap all queries at 100 results
+
+  # --- Username/password fallback (prefer api_token when possible) ---
+  homelab-user:
+    server: http://zabbix.homelab/
+    username: admin
+    # password stored here will emit a warning — prefer api_token or env var
+    password: ""
+
+  # --- HTTPS with a corporate CA bundle ---
+  staging:
+    server: https://zabbix.staging.example.com/
+    api_token: zbx_YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY
+    tls:
+      insecure: false
+      ca_bundle: /etc/ssl/certs/corp-ca-bundle.pem
+
+  # --- Mutual TLS (client certificate authentication) ---
+  production-mtls:
+    server: https://zabbix.prod.example.com/
+    api_token: zbx_ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ
+    tls:
+      insecure: false
+      ca_bundle: /etc/ssl/certs/prod-ca-bundle.pem
+      client_cert: ~/.config/zabctl/client.crt
+      client_key: ~/.config/zabctl/client.key
+
+  # --- Behind a corporate proxy ---
+  corp:
+    server: https://zabbix.corp.example.com/
+    api_token: zbx_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+    tls:
+      ca_bundle: /etc/ssl/certs/corp-ca.pem
+    proxy:
+      http: http://proxy.corp.example.com:8080
+      https: http://proxy.corp.example.com:8080
+      # Comma-separated hostnames/CIDRs that bypass the proxy.
+      no_proxy: localhost,127.0.0.1,.corp.example.com
+
+  # --- Skip TLS verification (development/self-signed only — not for production) ---
+  dev-insecure:
+    server: https://zabbix.dev.local/
+    api_token: zbx_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+    tls:
+      insecure: true

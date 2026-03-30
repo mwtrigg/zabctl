@@ -24,6 +24,12 @@ def llm() -> None:
 @click.pass_obj
 def llm_capabilities(cfg: ZabctlConfig) -> None:
     """Return the full command surface as JSON for agent bootstrapping."""
+    _pagination_flags = [
+        {"name": "--limit", "description": "Maximum number of records to return"},
+        {"name": "--sort-by", "description": "Sort field (e.g. name, name:desc for descending)"},
+        {"name": "--filter", "description": "Extra Zabbix API key=value param (repeatable escape hatch)"},
+    ]
+
     payload = {
         "version": __version__,
         "commands": [
@@ -32,14 +38,9 @@ def llm_capabilities(cfg: ZabctlConfig) -> None:
                 "description": "List Zabbix hosts",
                 "flags": [
                     {"name": "--group", "description": "Filter by host group name"},
-                    {
-                        "name": "--status",
-                        "description": "Filter by monitoring status (monitored|unmonitored)",
-                    },
-                    {
-                        "name": "--search",
-                        "description": "Search string matched against host name",
-                    },
+                    {"name": "--status", "description": "Filter by monitoring status (monitored|unmonitored)"},
+                    {"name": "--search", "description": "Search string matched against host name"},
+                    *_pagination_flags,
                 ],
                 "output_formats": ["table", "json", "jsonl", "yaml", "wide"],
                 "pipeable": True,
@@ -47,22 +48,21 @@ def llm_capabilities(cfg: ZabctlConfig) -> None:
             },
             {
                 "name": "get host <id|name>",
-                "description": "Show a single Zabbix host",
+                "description": "Show a single Zabbix host by id or technical name",
                 "flags": [],
                 "output_formats": ["table", "json", "jsonl", "yaml", "wide"],
                 "pipeable": False,
                 "stdin_accepts": None,
+                "note": "Single-object lookup; does not accept piped ids yet (planned)",
             },
             {
                 "name": "get items <host>",
                 "description": "List items for a host",
                 "flags": [
                     {"name": "--key", "description": "Filter by item key pattern"},
-                    {"name": "--type", "description": "Filter by item type"},
-                    {
-                        "name": "--status",
-                        "description": "Filter by item status (enabled|disabled)",
-                    },
+                    {"name": "--type", "description": "Filter by item type (numeric)"},
+                    {"name": "--status", "description": "Filter by item status (enabled|disabled)"},
+                    *_pagination_flags,
                 ],
                 "output_formats": ["table", "json", "jsonl", "yaml", "wide"],
                 "pipeable": True,
@@ -72,37 +72,24 @@ def llm_capabilities(cfg: ZabctlConfig) -> None:
                 "name": "get triggers",
                 "description": "List Zabbix triggers",
                 "flags": [
-                    {
-                        "name": "--severity",
-                        "description": "Filter by severity (name or 0–5)",
-                    },
+                    {"name": "--severity", "description": "Filter by severity (not_classified|information|warning|average|high|disaster or 0–5)"},
                     {"name": "--host", "description": "Filter by host name"},
-                    {
-                        "name": "--status",
-                        "description": "Filter by trigger status (enabled|disabled)",
-                    },
+                    {"name": "--status", "description": "Filter by trigger status (enabled|disabled)"},
+                    *_pagination_flags,
                 ],
                 "output_formats": ["table", "json", "jsonl", "yaml", "wide"],
                 "pipeable": True,
                 "stdin_accepts": None,
             },
             {
-                "name": "get alerts",
-                "description": "List active alerts (Zabbix problems)",
+                "name": "get problems",
+                "description": "List active problems (Zabbix problem.get — the live problem list, not the event log)",
                 "flags": [
-                    {
-                        "name": "--severity",
-                        "description": "Filter by severity (name or 0–5)",
-                    },
+                    {"name": "--severity", "description": "Filter by severity (not_classified|information|warning|average|high|disaster or 0–5)"},
                     {"name": "--host", "description": "Filter by host name"},
-                    {
-                        "name": "--since",
-                        "description": "Show alerts since this time (ISO 8601 or Unix epoch)",
-                    },
-                    {
-                        "name": "--acknowledged",
-                        "description": "Include only acknowledged alerts",
-                    },
+                    {"name": "--since", "description": "Show problems since this time (ISO 8601 or Unix epoch)"},
+                    {"name": "--acknowledged", "description": "Show only acknowledged problems (default: show all, both acknowledged and unacknowledged)"},
+                    *_pagination_flags,
                 ],
                 "output_formats": ["table", "json", "jsonl", "yaml", "wide"],
                 "pipeable": True,
@@ -112,10 +99,8 @@ def llm_capabilities(cfg: ZabctlConfig) -> None:
                 "name": "get templates",
                 "description": "List Zabbix templates",
                 "flags": [
-                    {
-                        "name": "--search",
-                        "description": "Search string matched against template name",
-                    },
+                    {"name": "--search", "description": "Search string matched against template name"},
+                    *_pagination_flags,
                 ],
                 "output_formats": ["table", "json", "jsonl", "yaml", "wide"],
                 "pipeable": True,
@@ -123,16 +108,17 @@ def llm_capabilities(cfg: ZabctlConfig) -> None:
             },
             {
                 "name": "get template <id|name>",
-                "description": "Show a single template",
+                "description": "Show a single template by id or name",
                 "flags": [],
                 "output_formats": ["table", "json", "jsonl", "yaml", "wide"],
                 "pipeable": False,
                 "stdin_accepts": None,
+                "note": "Single-object lookup; does not accept piped ids yet (planned)",
             },
             {
                 "name": "get latestdata <host>",
-                "description": "Show latest item values for a host",
-                "flags": [],
+                "description": "Show the most recent value for every monitored item on a host",
+                "flags": [*_pagination_flags],
                 "output_formats": ["table", "json", "jsonl", "yaml", "wide"],
                 "pipeable": True,
                 "stdin_accepts": "host",
@@ -140,45 +126,71 @@ def llm_capabilities(cfg: ZabctlConfig) -> None:
             {
                 "name": "get groups",
                 "description": "List Zabbix host groups",
-                "flags": [],
+                "flags": [*_pagination_flags],
                 "output_formats": ["table", "json", "jsonl", "yaml", "wide"],
                 "pipeable": True,
                 "stdin_accepts": None,
             },
             {
                 "name": "get events",
-                "description": "List Zabbix events",
+                "description": "List Zabbix events (raw event log — use get problems for the live active-problem list)",
                 "flags": [
                     {"name": "--host", "description": "Filter by host name"},
-                    {
-                        "name": "--since",
-                        "description": "Show events since this time (ISO 8601 or Unix epoch)",
-                    },
-                    {"name": "--until", "description": "Show events until this time"},
-                    {
-                        "name": "--limit",
-                        "description": "Maximum number of events to return",
-                    },
+                    {"name": "--since", "description": "Show events since this time (ISO 8601 or Unix epoch)"},
+                    {"name": "--until", "description": "Show events until this time (ISO 8601 or Unix epoch)"},
+                    *_pagination_flags,
                 ],
                 "output_formats": ["table", "json", "jsonl", "yaml", "wide"],
                 "pipeable": True,
                 "stdin_accepts": None,
             },
             {
-                "name": "auth status",
-                "description": "Show current authentication status",
+                "name": "get users",
+                "description": "List Zabbix users",
+                "flags": [*_pagination_flags],
+                "output_formats": ["table", "json", "jsonl", "yaml", "wide"],
+                "pipeable": True,
+                "stdin_accepts": None,
+            },
+            {
+                "name": "get user <id|username>",
+                "description": "Show a single Zabbix user by userid or username",
+                "flags": [],
+                "output_formats": ["table", "json", "jsonl", "yaml", "wide"],
+                "pipeable": False,
+                "stdin_accepts": None,
+            },
+            {
+                "name": "get usergroups",
+                "description": "List Zabbix user groups",
+                "flags": [*_pagination_flags],
+                "output_formats": ["table", "json", "jsonl", "yaml", "wide"],
+                "pipeable": True,
+                "stdin_accepts": None,
+            },
+            {
+                "name": "auth login",
+                "description": "Authenticate to the Zabbix server and verify connectivity",
+                "flags": [
+                    {"name": "--username", "description": "Zabbix username (overrides config/env)"},
+                    {"name": "--password", "description": "Zabbix password"},
+                ],
+                "output_formats": ["table"],
+                "pipeable": False,
+                "stdin_accepts": None,
+            },
+            {
+                "name": "auth logout",
+                "description": "Invalidate the current session token (no-op for API token auth)",
                 "flags": [],
                 "output_formats": ["table"],
                 "pipeable": False,
                 "stdin_accepts": None,
             },
             {
-                "name": "auth login",
-                "description": "Authenticate to the Zabbix server",
-                "flags": [
-                    {"name": "--username", "description": "Zabbix username"},
-                    {"name": "--password", "description": "Zabbix password"},
-                ],
+                "name": "auth status",
+                "description": "Show current authentication configuration and test live connectivity",
+                "flags": [],
                 "output_formats": ["table"],
                 "pipeable": False,
                 "stdin_accepts": None,
@@ -193,7 +205,7 @@ def llm_capabilities(cfg: ZabctlConfig) -> None:
             },
             {
                 "name": "context use <name>",
-                "description": "Switch the active context",
+                "description": "Switch the active context in the config file",
                 "flags": [],
                 "output_formats": ["table"],
                 "pipeable": False,
@@ -262,8 +274,8 @@ def llm_pipeline(cfg: ZabctlConfig) -> None:
                 "command": "zabctl get hosts --search web -o jsonl --field host | zabctl get latestdata --stdin-field host",
             },
             {
-                "description": "Acknowledge all active critical alerts",
-                "command": "zabctl get alerts --severity critical -o jsonl --field eventid | zabctl acknowledge --stdin-field eventid --message 'Auto-ack by agent'",
+                "description": "Acknowledge all active critical problems",
+                "command": "zabctl get problems --severity critical -o jsonl --field eventid | zabctl acknowledge --stdin-field eventid --message 'Auto-ack by agent'",
             },
             {
                 "description": "Extract just IPs from hosts for external tooling",
@@ -336,17 +348,17 @@ def llm_schema(cfg: ZabctlConfig, command_path: str) -> None:
                 },
             },
         },
-        "get alerts": {
+        "get problems": {
             "type": "array",
             "items": {
                 "type": "object",
                 "properties": {
                     "eventid": {"type": "string"},
                     "objectid": {"type": "string", "description": "Trigger id"},
-                    "severity": {"type": "string"},
+                    "severity": {"type": "string", "description": "0=not classified … 5=disaster"},
                     "name": {"type": "string"},
                     "clock": {"type": "string", "description": "Unix timestamp"},
-                    "acknowledged": {"type": "string", "enum": ["0", "1"]},
+                    "acknowledged": {"type": "string", "enum": ["0", "1"], "description": "0=no, 1=yes"},
                     "hosts": {"type": "array"},
                 },
             },

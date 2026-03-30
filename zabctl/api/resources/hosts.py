@@ -16,12 +16,23 @@ _HOST_SELECT = {
 _STATUS_MAP = {"monitored": "0", "unmonitored": "1"}
 
 
+def _parse_sort(sort_by: str) -> tuple[str, str]:
+    """Parse 'field' or 'field:desc' into (field, ORDER)."""
+    if ":" in sort_by:
+        field, order = sort_by.rsplit(":", 1)
+        return field, order.upper()
+    return sort_by, "ASC"
+
+
 def get_hosts(
     client: ZabbixClient,
     *,
     group: str | None = None,
     status: str | None = None,
     search: str | None = None,
+    limit: int | None = None,
+    sort_by: str | None = None,
+    extra_params: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Return a list of hosts."""
     params: dict[str, Any] = {
@@ -38,6 +49,17 @@ def get_hosts(
     if search:
         params["search"] = {"host": search, "name": search}
         params["searchByAny"] = True
+
+    if limit is not None:
+        params["limit"] = limit
+
+    if sort_by:
+        field, order = _parse_sort(sort_by)
+        params["sortfield"] = [field]
+        params["sortorder"] = order
+
+    if extra_params:
+        params.update(extra_params)
 
     result: list[dict[str, Any]] = client.call("host.get", params)
     return result

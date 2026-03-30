@@ -196,7 +196,7 @@ Implemented in `zabctl/output/formatter.py` and `zabctl/cli/__init__.py`:
 | `get host <id\|name>` | `host.get` | single object detail |
 | `get items <host>` | `item.get` | `--key`, `--type`, `--status` |
 | `get triggers` | `trigger.get` | `--severity`, `--host`, `--status` |
-| `get alerts` | `problem.get` | `--severity`, `--host`, `--since`, `--acknowledged` |
+| `get problems` | `problem.get` | `--severity`, `--host`, `--since`, `--acknowledged` |
 | `get templates` | `template.get` | `--search` |
 | `get template <id\|name>` | `template.get` | single object detail |
 | `get latestdata <host>` | `item.get` + last value | most recent value per item |
@@ -279,7 +279,7 @@ These commands enable version-controlling Zabbix configuration and diffing envir
 - TUI mode: `zabctl tui`
 - `zabctl llm mcp` — expose zabctl as an MCP tool server so agents can call it natively without subprocess — Bubble Tea equivalent in Python via [Textual](https://textual.textualize.io/)
 - Multi-server bulk operations: run a command across all configured contexts
-- `watch` mode: `zabctl get alerts --watch` (poll and refresh)
+- `watch` mode: `zabctl get problems --watch` (poll and refresh)
 - `zabctl get latestdata --graph` — sparkline in terminal via Rich
 - OpenTelemetry traces for agent observability
 - `zabctl doctor` — validate config, test connectivity, check API version compatibility

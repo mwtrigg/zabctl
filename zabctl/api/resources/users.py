@@ -1,4 +1,4 @@
-"""Zabbix template resource."""
+"""Zabbix user resource."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from typing import Any
 
 from zabctl.api.client import ZabbixClient, ZabbixNotFoundError
 
-_TEMPLATE_OUTPUT = ["templateid", "name", "description"]
+_USER_OUTPUT = ["userid", "username", "name", "surname", "roleid"]
 
 
 def _parse_sort(sort_by: str) -> tuple[str, str]:
@@ -16,19 +16,20 @@ def _parse_sort(sort_by: str) -> tuple[str, str]:
     return sort_by, "ASC"
 
 
-def get_templates(
+def get_users(
     client: ZabbixClient,
     *,
-    search: str | None = None,
     limit: int | None = None,
     sort_by: str | None = None,
     extra_params: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-    """Return templates."""
-    params: dict[str, Any] = {"output": _TEMPLATE_OUTPUT}
-
-    if search:
-        params["search"] = {"name": search}
+    """Return all users."""
+    params: dict[str, Any] = {
+        "output": _USER_OUTPUT,
+        "selectUsrgrps": ["usrgrpid", "name"],
+        "sortfield": "username",
+        "sortorder": "ASC",
+    }
 
     if limit is not None:
         params["limit"] = limit
@@ -41,27 +42,27 @@ def get_templates(
     if extra_params:
         params.update(extra_params)
 
-    result: list[dict[str, Any]] = client.call("template.get", params)
+    result: list[dict[str, Any]] = client.call("user.get", params)
     return result
 
 
-def get_template(
+def get_user(
     client: ZabbixClient,
-    template_id_or_name: str,
+    user_id_or_name: str,
 ) -> dict[str, Any]:
-    """Return a single template by id or name."""
+    """Return a single user by userid or username."""
     params: dict[str, Any] = {
-        "output": _TEMPLATE_OUTPUT,
-        "selectGroups": ["groupid", "name"],
-        "selectHosts": ["hostid", "host", "name"],
+        "output": _USER_OUTPUT,
+        "selectUsrgrps": ["usrgrpid", "name"],
+        "selectRole": ["roleid", "name"],
     }
 
-    if template_id_or_name.isdigit():
-        params["templateids"] = [template_id_or_name]
+    if user_id_or_name.isdigit():
+        params["userids"] = [user_id_or_name]
     else:
-        params["filter"] = {"name": template_id_or_name}
+        params["filter"] = {"username": user_id_or_name}
 
-    result: list[dict[str, Any]] = client.call("template.get", params)
+    result: list[dict[str, Any]] = client.call("user.get", params)
     if not result:
-        raise ZabbixNotFoundError(f"Template not found: {template_id_or_name!r}")
+        raise ZabbixNotFoundError(f"User not found: {user_id_or_name!r}")
     return result[0]

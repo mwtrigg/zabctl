@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import contextlib
 import ssl
+import sys
 from typing import Any
 
 import httpx
@@ -237,6 +238,16 @@ class ZabbixClient:
 
     def _send(self, method: str, params: dict[str, Any], auth: str | None) -> Any:
         payload = self._build_rpc_payload(method, params, auth)
+        if self._config.explain:
+            import json as _json
+
+            safe = {**payload}
+            if safe.get("auth"):
+                safe["auth"] = "***"
+            print(
+                _json.dumps({"endpoint": self._endpoint(), "request": safe}, indent=2),
+                file=sys.stderr,
+            )
         try:
             resp = self._http.post(self._endpoint(), json=payload)
             resp.raise_for_status()

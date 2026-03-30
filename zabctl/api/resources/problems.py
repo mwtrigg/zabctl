@@ -1,6 +1,6 @@
-"""Zabbix alerts/problems resource.
+"""Zabbix problems resource.
 
-Zabbix calls these "problems" internally; we expose them as "alerts" for friendliness.
+Zabbix calls these "problems" internally; we expose them via the `get problems` command.
 """
 
 from __future__ import annotations
@@ -28,16 +28,20 @@ def _parse_time(value: str) -> int:
     value = value.strip()
     if value.isdigit():
         return int(value)
-    # Try ISO 8601
     for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
         try:
-            dt = datetime.datetime.strptime(value, fmt).replace(
-                tzinfo=datetime.UTC
-            )
+            dt = datetime.datetime.strptime(value, fmt).replace(tzinfo=datetime.UTC)
             return int(dt.timestamp())
         except ValueError:
             continue
     raise ValueError(f"Cannot parse time: {value!r}")
+
+
+def _parse_sort(sort_by: str) -> tuple[str, str]:
+    if ":" in sort_by:
+        field, order = sort_by.rsplit(":", 1)
+        return field, order.upper()
+    return sort_by, "ASC"
 
 
 def get_alerts(
@@ -47,11 +51,13 @@ def get_alerts(
     host: str | None = None,
     since: str | None = None,
     acknowledged: bool | None = None,
+    limit: int | None = None,
+    sort_by: str | None = None,
+    extra_params: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Return active alerts (problems)."""
     params: dict[str, Any] = {
         "output": _PROBLEM_OUTPUT,
-        "selectHosts": ["hostid", "host", "name"],
         "sortfield": ["eventid"],
         "sortorder": "DESC",
         "recent": True,  # active + recently resolved
@@ -62,7 +68,6 @@ def get_alerts(
         params["severities"] = [sev]
 
     if host:
-        # Resolve via trigger host filter
         params["hostids"] = _resolve_host_id(client, host)
 
     if since:
@@ -70,6 +75,17 @@ def get_alerts(
 
     if acknowledged is not None:
         params["acknowledged"] = 1 if acknowledged else 0
+
+    if limit is not None:
+        params["limit"] = limit
+
+    if sort_by:
+        field, order = _parse_sort(sort_by)
+        params["sortfield"] = [field]
+        params["sortorder"] = order
+
+    if extra_params:
+        params.update(extra_params)
 
     result: list[dict[str, Any]] = client.call("problem.get", params)
     return result

@@ -45,10 +45,12 @@ zabctl/
 │   │       ├── hosts.py
 │   │       ├── items.py
 │   │       ├── triggers.py
-│   │       ├── alerts.py
+│   │       ├── problems.py
 │   │       ├── templates.py
 │   │       ├── events.py
-│   │       └── groups.py
+│   │       ├── groups.py
+│   │       ├── users.py
+│   │       └── usergroups.py
 │   ├── config/
 │   │   └── loader.py        # env → param → config file resolution
 │   └── output/
@@ -237,8 +239,8 @@ zabctl get hosts --group "Linux Servers" -o jsonl --field host   | zabctl get it
 # Get latest data for hosts matching a search
 zabctl get hosts --search "web" -o jsonl --field host   | zabctl get latestdata --stdin-field host
 
-# Acknowledge all active critical alerts
-zabctl get alerts --severity critical -o jsonl --field eventid   | zabctl acknowledge --stdin-field eventid --message "Auto-ack by agent"
+# Acknowledge all active critical problems
+zabctl get problems --severity critical -o jsonl --field eventid   | zabctl acknowledge --stdin-field eventid --message "Auto-ack by agent"
 
 # Extract just IPs from hosts for external tooling
 zabctl get hosts -o jsonl --field interfaces[0].ip
@@ -290,11 +292,14 @@ zabctl
     ├── host <id|name>
     ├── items <host>   [--key] [--type] [--status]
     ├── triggers       [--severity] [--host] [--status]
-    ├── alerts         [--severity] [--host] [--since] [--acknowledged]
+    ├── problems       [--severity] [--host] [--since] [--acknowledged]
     ├── templates      [--search]
     ├── template <id|name>
     ├── latestdata <host>
     ├── groups
+    ├── users
+    ├── user <id|username>
+    ├── usergroups
     └── events         [--host] [--since] [--until] [--limit]
 ```
 

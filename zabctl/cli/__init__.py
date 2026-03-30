@@ -93,6 +93,12 @@ from .llm import llm
     default=None,
     help="Comma-separated hostnames/CIDRs to bypass proxy.",
 )
+@click.option(
+    "--explain",
+    is_flag=True,
+    default=False,
+    help="Print the JSON-RPC request(s) that would be sent to stderr (debug/agent transparency).",
+)
 @click.pass_context
 def cli(
     ctx: click.Context,
@@ -108,6 +114,7 @@ def cli(
     client_key: str | None,
     proxy: str | None,
     no_proxy: str | None,
+    explain: bool,
 ) -> None:
     """zabctl — CLI for managing Zabbix monitoring environments."""
     ctx.ensure_object(dict)
@@ -118,6 +125,7 @@ def cli(
         password=password,
         context_name=context_name,
         output=output,
+        explain=explain,
         insecure=insecure if insecure else None,
         ca_bundle=ca_bundle,
         client_cert=client_cert,
@@ -125,6 +133,27 @@ def cli(
         proxy=proxy,
         no_proxy=no_proxy,
     )
+
+
+@cli.command("completions")
+@click.argument("shell", type=click.Choice(["bash", "zsh", "fish"]))
+def completions(shell: str) -> None:
+    """Print shell completion setup instructions.
+
+    To activate completions, run the printed command or add it to your shell rc file.
+
+    \b
+    Examples:
+      zabctl completions bash >> ~/.bashrc
+      zabctl completions zsh  >> ~/.zshrc
+      zabctl completions fish > ~/.config/fish/completions/zabctl.fish
+    """
+    instructions = {
+        "bash": 'eval "$(_ZABCTL_COMPLETE=bash_source zabctl)"',
+        "zsh": 'eval "$(_ZABCTL_COMPLETE=zsh_source zabctl)"',
+        "fish": "_ZABCTL_COMPLETE=fish_source zabctl | source",
+    }
+    click.echo(instructions[shell])
 
 
 cli.add_command(auth)
