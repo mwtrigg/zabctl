@@ -232,6 +232,10 @@ class ZabbixClient:
             message: str = err.get("message", "unknown error")
             data: str = err.get("data", "")
             if code in _AUTH_ERROR_CODES:
+                # -32500 is overloaded: Zabbix uses it for both auth failures
+                # and "object does not exist" errors. Distinguish by data string.
+                if code == -32500 and "does not exist" in data:
+                    raise ZabbixNotFoundError(data or message)
                 raise ZabbixAuthError(code, message, data)
             raise ZabbixAPIError(code, message, data)
         return response.get("result")

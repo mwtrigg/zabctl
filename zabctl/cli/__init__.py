@@ -19,6 +19,7 @@ from .auth import auth
 from .context import context
 from .get import get
 from .llm import llm
+from .write import acknowledge, create_group, delete_group, disable, enable, maintenance_group, tag_group, untag_group
 
 
 @click.group()
@@ -160,3 +161,11 @@ cli.add_command(auth)
 cli.add_command(context)
 cli.add_command(get)
 cli.add_command(llm)
+cli.add_command(enable)
+cli.add_command(disable)
+cli.add_command(acknowledge)
+cli.add_command(maintenance_group, name="maintenance")
+cli.add_command(create_group, name="create")
+cli.add_command(delete_group, name="delete")
+cli.add_command(tag_group, name="tag")
+cli.add_command(untag_group, name="untag")

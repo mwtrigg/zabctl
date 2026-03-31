@@ -721,7 +721,7 @@ uv run pytest -v
 
 **When:** Enable/disable, acknowledge, create, and delete commands are working.
 
-**Why:** Write operations need stricter review — confirmation prompts, `--force` behavior,
+**Why:** Write operations need stricter review — confirmation prompts, `--yes` behavior,
 stderr messaging in json mode, and exit codes on partial failures.
 
 **Run these commands and paste all output into claude.ai:**
@@ -732,7 +732,7 @@ uv run zabctl llm capabilities
 
 # Dry-run / confirmation behavior check
 uv run zabctl delete host some-test-host   # should prompt
-uv run zabctl delete host some-test-host --force  # should skip prompt
+uv run zabctl delete host some-test-host --yes    # should skip prompt
 
 # Write command JSON output shape
 uv run zabctl enable host some-test-host --output json

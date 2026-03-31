@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from zabctl.api.client import ZabbixClient
+from zabctl.api.utils import parse_sort
 
 _TRIGGER_OUTPUT = ["triggerid", "description", "priority", "status", "value", "lastchange"]
 
@@ -18,13 +19,6 @@ _SEVERITY_MAP = {
 }
 
 _STATUS_MAP = {"enabled": "0", "disabled": "1"}
-
-
-def _parse_sort(sort_by: str) -> tuple[str, str]:
-    if ":" in sort_by:
-        field, order = sort_by.rsplit(":", 1)
-        return field, order.upper()
-    return sort_by, "ASC"
 
 
 def get_triggers(
@@ -62,7 +56,7 @@ def get_triggers(
         params["limit"] = limit
 
     if sort_by:
-        field, order = _parse_sort(sort_by)
+        field, order = parse_sort(sort_by)
         params["sortfield"] = field
         params["sortorder"] = order
 
@@ -70,4 +64,16 @@ def get_triggers(
         params.update(extra_params)
 
     result: list[dict[str, Any]] = client.call("trigger.get", params)
+    return result
+
+
+def enable_trigger(client: ZabbixClient, trigger_id: str) -> dict[str, Any]:
+    """Set trigger status=0 (enabled). Returns {"triggerids": [...]}."""
+    result: dict[str, Any] = client.call("trigger.update", {"triggerid": trigger_id, "status": 0})
+    return result
+
+
+def disable_trigger(client: ZabbixClient, trigger_id: str) -> dict[str, Any]:
+    """Set trigger status=1 (disabled). Returns {"triggerids": [...]}."""
+    result: dict[str, Any] = client.call("trigger.update", {"triggerid": trigger_id, "status": 1})
     return result

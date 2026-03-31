@@ -267,26 +267,26 @@ Note: `selectInventory` intentionally excluded — no identified use case yet.
 
 ---
 
-## Phase 3 — Write Operations
+## Phase 3 — Write Operations ✅ (0.3.0)
 
 **Goal:** Basic lifecycle management. Treat destructive operations with care.
 
 | Command | API Method | Notes |
 |---|---|---|
-| `enable host <id\|name>` | `host.update` | Sets status=0 |
-| `disable host <id\|name>` | `host.update` | Sets status=1 |
-| `enable trigger <id>` | `trigger.update` | |
-| `disable trigger <id>` | `trigger.update` | |
-| `acknowledge <problem-id>` | `event.acknowledge` | `--message` required |
-| `maintenance create` | `maintenance.create` | `--host`, `--start`, `--duration` |
-| `maintenance delete <id>` | `maintenance.delete` | |
-| `create host` | `host.create` | `--from-file <yaml>` or interactive |
-| `delete host <id\|name>` | `host.delete` | Confirmation prompt; `--force` to skip |
+| `enable host <id\|name>` | `host.update` | Sets status=0 ✅ |
+| `disable host <id\|name>` | `host.update` | Sets status=1 ✅ |
+| `enable trigger <id>` | `trigger.update` | ✅ |
+| `disable trigger <id>` | `trigger.update` | ✅ |
+| `acknowledge <problem-id>` | `event.acknowledge` | `--message` required; `--close` for ack+close ✅ |
+| `maintenance create` | `maintenance.create` | `--host`, `--start`, `--duration` ✅ |
+| `maintenance delete <id>` | `maintenance.delete` | ✅ |
+| `create host` | `host.create` | `--from-file <yaml>` or `--host`/`--group` flags ✅ |
+| `delete host <id\|name>` | `host.delete` | Confirmation prompt; `--yes` to skip ✅ |
 
 Safety rules:
-- All destructive commands prompt for confirmation unless `--force` or `--yes`
-- `--output json` on write commands returns the affected object ID(s) in envelope
-- Write commands always emit a human-readable summary to stderr even in json mode
+- All destructive commands prompt for confirmation unless `--yes`/`-y` ✅
+- `--output json` on write commands returns the affected object ID(s) in envelope ✅
+- Write commands always emit a human-readable summary to stderr even in json mode ✅
 
 ---
 
@@ -324,6 +324,6 @@ These commands enable version-controlling Zabbix configuration and diffing envir
 | 0.1.0 | Phase 0 | Scaffold, config system, auth stubs |
 | 0.2.0 | Phase 1 + 2 | All get commands, pagination, users/usergroups, config defaults |
 | 0.2.1 | Phase 2.5 | get host detail view (tags, macros, templates) |
-| 0.3.0 | Phase 3 | Write operations |
+| 0.3.0 | Phase 3 | Write operations (enable/disable, acknowledge, maintenance, create/delete host) |
 | 0.4.0 | Phase 4 | Template management |
 | 1.0.0 | — | API stable, docs complete, production-ready |

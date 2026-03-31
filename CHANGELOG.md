@@ -7,6 +7,24 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-03-31
+
+### Added
+- `enable host <id|name>` / `disable host <id|name>` — toggle host monitoring status.
+- `enable trigger <id>` / `disable trigger <id>` — toggle trigger status.
+- `acknowledge <event-id> --message <msg>` — acknowledge a problem event; `--close` also closes it.
+- `maintenance create` — create a maintenance window (`--host`, `--start`, `--duration`, `--name`, `--no-data`).
+- `maintenance delete <id>` — delete a maintenance window.
+- `create host` — create a host from flags (`--host`, `--group`, `--template`, `--ip`, `--port`) or `--from-file <yaml>`.
+- `delete host <id|name>` — delete a host with confirmation prompt; `--yes` to skip.
+- All destructive commands prompt for confirmation and accept `--yes`/`-y` to skip.
+- Write commands always emit a human-readable summary to stderr regardless of `--output` setting.
+- `llm capabilities` now includes write commands with `mutates` and `confirmation_required` fields.
+
+### Changed
+- Extracted `parse_time` / `parse_sort` to `zabctl/api/utils.py` (shared across resource modules).
+- Extracted `_make_client` / `_handle_api_error` / `_resolve_output` to `zabctl/cli/_common.py`.
+
 ## [0.2.1] - 2026-03-30
 
 ### Changed

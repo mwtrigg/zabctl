@@ -5,33 +5,9 @@ from __future__ import annotations
 from typing import Any
 
 from zabctl.api.client import ZabbixClient
+from zabctl.api.utils import parse_sort, parse_time
 
 _EVENT_OUTPUT = ["eventid", "source", "object", "objectid", "clock", "value", "acknowledged", "name", "severity"]
-
-
-def _parse_time(value: str) -> int:
-    """Parse an ISO 8601 string or Unix epoch string to an integer timestamp."""
-    import datetime
-
-    value = value.strip()
-    if value.isdigit():
-        return int(value)
-    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
-        try:
-            dt = datetime.datetime.strptime(value, fmt).replace(
-                tzinfo=datetime.UTC
-            )
-            return int(dt.timestamp())
-        except ValueError:
-            continue
-    raise ValueError(f"Cannot parse time: {value!r}")
-
-
-def _parse_sort(sort_by: str) -> tuple[str, str]:
-    if ":" in sort_by:
-        field, order = sort_by.rsplit(":", 1)
-        return field, order.upper()
-    return sort_by, "ASC"
 
 
 def get_events(
@@ -58,16 +34,16 @@ def get_events(
         params["hostids"] = hostids
 
     if since:
-        params["time_from"] = _parse_time(since)
+        params["time_from"] = parse_time(since)
 
     if until:
-        params["time_till"] = _parse_time(until)
+        params["time_till"] = parse_time(until)
 
     if limit:
         params["limit"] = limit
 
     if sort_by:
-        field, order = _parse_sort(sort_by)
+        field, order = parse_sort(sort_by)
         params["sortfield"] = field
         params["sortorder"] = order
 
@@ -75,6 +51,55 @@ def get_events(
         params.update(extra_params)
 
     result: list[dict[str, Any]] = client.call("event.get", params)
+    return result
+
+
+_ACK_CLOSE = 1         # Close problem
+_ACK_ACKNOWLEDGE = 2   # Acknowledge event
+_ACK_MESSAGE = 4       # Add message
+_ACK_UNACKNOWLEDGE = 16  # Unacknowledge event (Zabbix 5.4+)
+_ACK_SUPPRESS = 32     # Suppress event (Zabbix 6.0+)
+_ACK_UNSUPPRESS = 64   # Unsuppress event (Zabbix 6.0+)
+
+
+def acknowledge_event(
+    client: ZabbixClient,
+    event_id: str,
+    message: str | None = None,
+    close: bool = False,
+    suppress: bool = False,
+    unsuppress: bool = False,
+    unacknowledge: bool = False,
+) -> dict[str, Any]:
+    """
+    Perform an action on a problem event.
+
+    action bitmask (Zabbix 6.0+):
+      1=close, 2=acknowledge, 4=add message,
+      16=unacknowledge, 32=suppress, 64=unsuppress
+    """
+    action = 0
+
+    if suppress:
+        action |= _ACK_SUPPRESS
+    elif unsuppress:
+        action |= _ACK_UNSUPPRESS
+    elif unacknowledge:
+        action |= _ACK_UNACKNOWLEDGE
+    else:
+        # Default: acknowledge the event.
+        action |= _ACK_ACKNOWLEDGE
+
+    if close:
+        action |= _ACK_CLOSE
+    if message:
+        action |= _ACK_MESSAGE
+
+    params: dict[str, Any] = {"eventids": [event_id], "action": action}
+    if message:
+        params["message"] = message
+
+    result: dict[str, Any] = client.call("event.acknowledge", params)
     return result
 
 

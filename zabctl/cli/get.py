@@ -13,14 +13,7 @@ from itertools import islice
 from typing import Any
 
 import click
-import httpx
 
-from zabctl.api.client import (
-    ZabbixAPIError,
-    ZabbixAuthError,
-    ZabbixClient,
-    ZabbixNotFoundError,
-)
 from zabctl.api.resources import (
     events,
     groups,
@@ -32,6 +25,7 @@ from zabctl.api.resources import (
     usergroups,
     users,
 )
+from zabctl.cli._common import _handle_api_error, _make_client, _resolve_output
 from zabctl.config.loader import ZabctlConfig
 from zabctl.output.formatter import format_error, format_output
 
@@ -61,10 +55,6 @@ _PAGINATION_OPTIONS = [
 ]
 
 
-def _resolve_output(ctx_output: str, local_output: str | None) -> str:
-    return local_output or ctx_output or "table"
-
-
 def _resolve(cfg: ZabctlConfig, flag: str, explicit: Any, fallback: Any = None) -> Any:
     """Return the first non-None value from: explicit CLI flag → config defaults → fallback."""
     if explicit is not None:
@@ -87,36 +77,6 @@ def _parse_extra_filters(extra_filters: tuple[str, ...]) -> dict[str, Any]:
         except json.JSONDecodeError:
             result[key.strip()] = raw
     return result
-
-
-def _make_client(cfg: ZabctlConfig) -> ZabbixClient:
-    """Build and authenticate a ZabbixClient, mapping errors to clean exit codes."""
-    client = ZabbixClient(cfg)
-    try:
-        client.login()
-    except ZabbixAuthError as exc:
-        format_error(str(exc), exit_code=3)
-    except httpx.ConnectError as exc:
-        format_error(str(exc), exit_code=4)
-    except httpx.TimeoutException:
-        format_error(f"Connection to {cfg.server} timed out", exit_code=4)
-    return client
-
-
-def _handle_api_error(exc: Exception) -> None:
-    """Map API/network exceptions to clean exit messages."""
-    if isinstance(exc, ZabbixNotFoundError):
-        format_error(str(exc), exit_code=2)
-    elif isinstance(exc, ZabbixAuthError):
-        format_error(str(exc), exit_code=3)
-    elif isinstance(exc, httpx.ConnectError):
-        format_error(str(exc), exit_code=4)
-    elif isinstance(exc, httpx.TimeoutException):
-        format_error("Request timed out", exit_code=4)
-    elif isinstance(exc, ZabbixAPIError):
-        format_error(f"Zabbix API error {exc.code}: {exc}", exit_code=1)
-    else:
-        format_error(str(exc), exit_code=1)
 
 
 def _read_stdin_lines(from_stdin: bool) -> list[str] | None:

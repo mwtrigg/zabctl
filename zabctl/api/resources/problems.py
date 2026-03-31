@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 from zabctl.api.client import ZabbixClient
+from zabctl.api.utils import parse_sort, parse_time
 
 _PROBLEM_OUTPUT = ["eventid", "objectid", "severity", "name", "clock", "acknowledged", "r_eventid"]
 
@@ -19,29 +20,6 @@ _SEVERITY_MAP = {
     "high": "4",
     "disaster": "5",
 }
-
-
-def _parse_time(value: str) -> int:
-    """Parse an ISO 8601 string or Unix epoch string to an integer timestamp."""
-    import datetime
-
-    value = value.strip()
-    if value.isdigit():
-        return int(value)
-    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
-        try:
-            dt = datetime.datetime.strptime(value, fmt).replace(tzinfo=datetime.UTC)
-            return int(dt.timestamp())
-        except ValueError:
-            continue
-    raise ValueError(f"Cannot parse time: {value!r}")
-
-
-def _parse_sort(sort_by: str) -> tuple[str, str]:
-    if ":" in sort_by:
-        field, order = sort_by.rsplit(":", 1)
-        return field, order.upper()
-    return sort_by, "ASC"
 
 
 def get_alerts(
@@ -71,7 +49,7 @@ def get_alerts(
         params["hostids"] = _resolve_host_id(client, host)
 
     if since:
-        params["time_from"] = _parse_time(since)
+        params["time_from"] = parse_time(since)
 
     if acknowledged is not None:
         params["acknowledged"] = 1 if acknowledged else 0
@@ -80,7 +58,7 @@ def get_alerts(
         params["limit"] = limit
 
     if sort_by:
-        field, order = _parse_sort(sort_by)
+        field, order = parse_sort(sort_by)
         params["sortfield"] = [field]
         params["sortorder"] = order
 
