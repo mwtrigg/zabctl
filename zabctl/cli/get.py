@@ -152,7 +152,7 @@ def get() -> None:
 @click.option("--from-stdin", is_flag=True, default=False, help="Read jsonl records from stdin.")
 @click.option("--batch-size", default=10, show_default=True, help="Batch size for stdin fan-out.")
 @click.option("--limit", default=None, type=int, help="Maximum number of records to return.")
-@click.option("--sort-by", default=None, metavar="FIELD[:desc]", help="Sort by field (append :desc for descending).")
+@click.option("--sort-by", default=None, metavar="FIELD[:desc]", help="Sort by a Zabbix field (append :desc for descending). Valid fields vary by resource.")
 @click.option("--filter", "extra_filters", multiple=True, metavar="KEY=VALUE", help="Extra Zabbix API params (repeatable).")
 @click.option("--no-headers", is_flag=True, default=False, help="Suppress table headers.")
 @click.option("--output", "-o", default=None, type=click.Choice(["table", "json", "jsonl", "yaml", "wide"]), help="Output format.")
@@ -195,8 +195,8 @@ def get_hosts(
         command="get hosts",
         server=cfg.server,
         api_version=client.api_version,
-        columns=["host", "name", "status", "interfaces[0].ip"],
-        wide_columns=["groups[0].name", "hostid"],
+        columns=["hostid", "host", "name", "status", "interfaces[0].ip"],
+        wide_columns=["groups[0].name"],
         no_headers=no_headers,
         field=field,
     )
@@ -245,7 +245,7 @@ def get_host(cfg: ZabctlConfig, id_or_name: str, output: str | None, no_headers:
 @click.option("--from-stdin", is_flag=True, default=False, help="Read jsonl records from stdin.")
 @click.option("--batch-size", default=10, show_default=True, help="Batch size for stdin fan-out.")
 @click.option("--limit", default=None, type=int, help="Maximum number of records to return.")
-@click.option("--sort-by", default=None, metavar="FIELD[:desc]", help="Sort by field (append :desc for descending).")
+@click.option("--sort-by", default=None, metavar="FIELD[:desc]", help="Sort by a Zabbix field (append :desc for descending). Valid fields vary by resource.")
 @click.option("--filter", "extra_filters", multiple=True, metavar="KEY=VALUE", help="Extra Zabbix API params (repeatable).")
 @click.option("--no-headers", is_flag=True, default=False, help="Suppress table headers.")
 @click.option("--output", "-o", default=None, type=click.Choice(["table", "json", "jsonl", "yaml", "wide"]), help="Output format.")
@@ -324,7 +324,7 @@ def get_items(
 @click.option("--from-stdin", is_flag=True, default=False, help="Read jsonl records from stdin.")
 @click.option("--batch-size", default=10, show_default=True, help="Batch size for stdin fan-out.")
 @click.option("--limit", default=None, type=int, help="Maximum number of records to return.")
-@click.option("--sort-by", default=None, metavar="FIELD[:desc]", help="Sort by field (append :desc for descending).")
+@click.option("--sort-by", default=None, metavar="FIELD[:desc]", help="Sort by a Zabbix field (append :desc for descending). Valid fields vary by resource.")
 @click.option("--filter", "extra_filters", multiple=True, metavar="KEY=VALUE", help="Extra Zabbix API params (repeatable).")
 @click.option("--no-headers", is_flag=True, default=False, help="Suppress table headers.")
 @click.option("--output", "-o", default=None, type=click.Choice(["table", "json", "jsonl", "yaml", "wide"]), help="Output format.")
@@ -388,7 +388,7 @@ def get_triggers(
 @click.option("--from-stdin", is_flag=True, default=False, help="Read jsonl records from stdin.")
 @click.option("--batch-size", default=10, show_default=True, help="Batch size for stdin fan-out.")
 @click.option("--limit", default=None, type=int, help="Maximum number of records to return.")
-@click.option("--sort-by", default=None, metavar="FIELD[:desc]", help="Sort by field (append :desc for descending).")
+@click.option("--sort-by", default=None, metavar="FIELD[:desc]", help="Sort by a Zabbix field (append :desc for descending). Valid fields vary by resource.")
 @click.option("--filter", "extra_filters", multiple=True, metavar="KEY=VALUE", help="Extra Zabbix API params (repeatable).")
 @click.option("--no-headers", is_flag=True, default=False, help="Suppress table headers.")
 @click.option("--output", "-o", default=None, type=click.Choice(["table", "json", "jsonl", "yaml", "wide"]), help="Output format.")
@@ -449,7 +449,7 @@ def get_problems(
 @click.option("--search", default=None, help="Search string matched against template name.")
 @click.option("--field", default=None, metavar="PATH", help="Extract one field per record.")
 @click.option("--limit", default=None, type=int, help="Maximum number of records to return.")
-@click.option("--sort-by", default=None, metavar="FIELD[:desc]", help="Sort by field (append :desc for descending).")
+@click.option("--sort-by", default=None, metavar="FIELD[:desc]", help="Sort by a Zabbix field (append :desc for descending). Valid fields vary by resource.")
 @click.option("--filter", "extra_filters", multiple=True, metavar="KEY=VALUE", help="Extra Zabbix API params (repeatable).")
 @click.option("--no-headers", is_flag=True, default=False, help="Suppress table headers.")
 @click.option("--output", "-o", default=None, type=click.Choice(["table", "json", "jsonl", "yaml", "wide"]), help="Output format.")
@@ -579,7 +579,7 @@ def get_latestdata(
 @get.command("groups")
 @click.option("--field", default=None, metavar="PATH", help="Extract one field per record.")
 @click.option("--limit", default=None, type=int, help="Maximum number of records to return.")
-@click.option("--sort-by", default=None, metavar="FIELD[:desc]", help="Sort by field (append :desc for descending).")
+@click.option("--sort-by", default=None, metavar="FIELD[:desc]", help="Sort by a Zabbix field (append :desc for descending). Valid fields vary by resource.")
 @click.option("--filter", "extra_filters", multiple=True, metavar="KEY=VALUE", help="Extra Zabbix API params (repeatable).")
 @click.option("--no-headers", is_flag=True, default=False, help="Suppress table headers.")
 @click.option("--output", "-o", default=None, type=click.Choice(["table", "json", "jsonl", "yaml", "wide"]), help="Output format.")
@@ -628,7 +628,7 @@ def get_groups(
 @click.option("--since", default=None, help="Show events since this time (ISO 8601 or Unix epoch).")
 @click.option("--until", default=None, help="Show events until this time (ISO 8601 or Unix epoch).")
 @click.option("--limit", default=None, type=int, help="Maximum number of records to return.")
-@click.option("--sort-by", default=None, metavar="FIELD[:desc]", help="Sort by field (append :desc for descending).")
+@click.option("--sort-by", default=None, metavar="FIELD[:desc]", help="Sort by a Zabbix field (append :desc for descending). Valid fields vary by resource.")
 @click.option("--filter", "extra_filters", multiple=True, metavar="KEY=VALUE", help="Extra Zabbix API params (repeatable).")
 @click.option("--field", default=None, metavar="PATH", help="Extract one field per record.")
 @click.option("--no-headers", is_flag=True, default=False, help="Suppress table headers.")
@@ -683,7 +683,7 @@ def get_events(
 @get.command("users")
 @click.option("--field", default=None, metavar="PATH", help="Extract one field per record.")
 @click.option("--limit", default=None, type=int, help="Maximum number of records to return.")
-@click.option("--sort-by", default=None, metavar="FIELD[:desc]", help="Sort by field (append :desc for descending).")
+@click.option("--sort-by", default=None, metavar="FIELD[:desc]", help="Sort by a Zabbix field (append :desc for descending). Valid fields vary by resource.")
 @click.option("--filter", "extra_filters", multiple=True, metavar="KEY=VALUE", help="Extra Zabbix API params (repeatable).")
 @click.option("--no-headers", is_flag=True, default=False, help="Suppress table headers.")
 @click.option("--output", "-o", default=None, type=click.Choice(["table", "json", "jsonl", "yaml", "wide"]), help="Output format.")
@@ -761,7 +761,7 @@ def get_user(cfg: ZabctlConfig, id_or_name: str, output: str | None, no_headers:
 @get.command("usergroups")
 @click.option("--field", default=None, metavar="PATH", help="Extract one field per record.")
 @click.option("--limit", default=None, type=int, help="Maximum number of records to return.")
-@click.option("--sort-by", default=None, metavar="FIELD[:desc]", help="Sort by field (append :desc for descending).")
+@click.option("--sort-by", default=None, metavar="FIELD[:desc]", help="Sort by a Zabbix field (append :desc for descending). Valid fields vary by resource.")
 @click.option("--filter", "extra_filters", multiple=True, metavar="KEY=VALUE", help="Extra Zabbix API params (repeatable).")
 @click.option("--no-headers", is_flag=True, default=False, help="Suppress table headers.")
 @click.option("--output", "-o", default=None, type=click.Choice(["table", "json", "jsonl", "yaml", "wide"]), help="Output format.")

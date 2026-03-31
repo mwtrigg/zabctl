@@ -202,6 +202,9 @@ Implemented in `zabctl/output/formatter.py` and `zabctl/cli/__init__.py`:
 | `get latestdata <host>` | `item.get` + last value | most recent value per item |
 | `get groups` | `hostgroup.get` | — |
 | `get events` | `event.get` | `--host`, `--since`, `--until`, `--limit` |
+| `get users` | `user.get` | — |
+| `get user <id\|username>` | `user.get` | single object detail |
+| `get usergroups` | `usergroup.get` | — |
 
 ### Resource Modules
 
@@ -223,16 +226,44 @@ CLI layer calls resource function → passes result to formatter. No API calls i
 
 ---
 
-## Phase 2 — Filtering, Pagination, Polish
+## Phase 2 — Filtering, Pagination, Polish ✅ (0.2.0)
 
 **Goal:** Power-user and agent-friendly ergonomics across all get commands.
 
-- `--limit` / `--page` on all collection commands
-- `--sort-by <field>` on all collection commands
-- `--filter key=value` — pass arbitrary params to Zabbix API (escape hatch)
-- Shell completions: `zabctl --install-completion` (Click's built-in)
-- `--explain` flag — print the JSON-RPC request that would be sent (debugging, agent transparency)
-- Improved error messages with Zabbix error codes surfaced cleanly
+- `--limit` / `--sort-by <field>` / `--filter key=value` on all collection commands ✅
+- Shell completions: `zabctl completions bash|zsh|fish` ✅
+- `--explain` flag — prints JSON-RPC requests to stderr (debug/agent transparency) ✅
+- Config `defaults:` block (global + per-context) for preferred output, sort, limit ✅
+- `get users` / `get user` / `get usergroups` (opportunistic addition) ✅
+- Renamed `get alerts` → `get problems` (matches Zabbix internal terminology) ✅
+
+Open items (tracked in TODO.md):
+- `auth status --output json` for programmatic auth checks
+- `get host` / `get template` / `get user` accepting piped IDs
+
+---
+
+## Phase 2.5 — Detail Views & Polish
+
+**Goal:** Make single-object `get` commands meaningfully richer than their list counterparts.
+
+### `get host <id|name>` — expanded detail ✅ (0.2.1)
+
+Returns additional fields not included in `get hosts`:
+
+| Field | API param | Contents |
+|---|---|---|
+| `tags` | `selectTags` | Host-level tags (`tag`, `value`) |
+| `macros` | `selectMacros` | User macros (`macro`, `value`, `description`) |
+| `parentTemplates` | `selectParentTemplates` | Directly linked templates (`templateid`, `name`) |
+
+Note: `selectInventory` intentionally excluded — no identified use case yet.
+
+### Planned
+
+- `get template <id|name>` — add `selectItems`, `selectTriggers`, `selectGraphs` for a full template summary
+- `get user <id|username>` — add `selectRole` detail (already fetched; surface in wide columns)
+- `auth status --output json` — structured output for agent auth checks
 
 ---
 
@@ -291,8 +322,8 @@ These commands enable version-controlling Zabbix configuration and diffing envir
 | Version | Phase | Notes |
 |---|---|---|
 | 0.1.0 | Phase 0 | Scaffold, config system, auth stubs |
-| 0.2.0 | Phase 1 | All get commands functional |
-| 0.3.0 | Phase 2 | Filtering, pagination, completions |
-| 0.4.0 | Phase 3 | Write operations |
-| 0.5.0 | Phase 4 | Template management |
+| 0.2.0 | Phase 1 + 2 | All get commands, pagination, users/usergroups, config defaults |
+| 0.2.1 | Phase 2.5 | get host detail view (tags, macros, templates) |
+| 0.3.0 | Phase 3 | Write operations |
+| 0.4.0 | Phase 4 | Template management |
 | 1.0.0 | — | API stable, docs complete, production-ready |

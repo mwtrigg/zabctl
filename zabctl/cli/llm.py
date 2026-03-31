@@ -26,7 +26,7 @@ def llm_capabilities(cfg: ZabctlConfig) -> None:
     """Return the full command surface as JSON for agent bootstrapping."""
     _pagination_flags = [
         {"name": "--limit", "description": "Maximum number of records to return"},
-        {"name": "--sort-by", "description": "Sort field (e.g. name, name:desc for descending)"},
+        {"name": "--sort-by", "description": "Sort by a Zabbix field for this resource (e.g. field, field:desc for descending). Valid fields vary by resource — check the Zabbix API docs for the method's sortfield parameter."},
         {"name": "--filter", "description": "Extra Zabbix API key=value param (repeatable escape hatch)"},
     ]
 
@@ -159,6 +159,7 @@ def llm_capabilities(cfg: ZabctlConfig) -> None:
                 "output_formats": ["table", "json", "jsonl", "yaml", "wide"],
                 "pipeable": False,
                 "stdin_accepts": None,
+                "note": "Single-object lookup; does not accept piped ids yet (planned)",
             },
             {
                 "name": "get usergroups",

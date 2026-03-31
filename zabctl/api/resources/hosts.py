@@ -65,14 +65,22 @@ def get_hosts(
     return result
 
 
+_HOST_DETAIL_SELECT = {
+    **_HOST_SELECT,
+    "selectTags": ["tag", "value"],
+    "selectMacros": ["macro", "value", "description"],
+    "selectParentTemplates": ["templateid", "name"],
+}
+
+
 def get_host(
     client: ZabbixClient,
     host_id_or_name: str,
 ) -> dict[str, Any]:
-    """Return a single host by id or name."""
+    """Return a single host with full detail (tags, macros, templates)."""
     params: dict[str, Any] = {
         "output": _HOST_OUTPUT,
-        **_HOST_SELECT,
+        **_HOST_DETAIL_SELECT,
     }
 
     # Try numeric id first, then host name.

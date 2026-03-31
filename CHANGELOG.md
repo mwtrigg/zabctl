@@ -7,13 +7,18 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-03-30
+
+### Changed
+- `get host <id|name>` now returns richer detail than `get hosts`: adds `tags`, `macros` (user macros), and `parentTemplates` (directly linked templates). Inventory intentionally excluded.
+
 ## [0.2.0] - 2026-03-30
 
 ### Added
 - `ZabbixClient`: full JSON-RPC 2.0 HTTP client with TLS, proxy, API token and user.login auth, context manager support, and `--explain` transparency mode.
 - All `get` commands fully functional against live Zabbix: hosts, host, items, triggers, problems, templates, template, latestdata, groups, events, users, user, usergroups.
 - `get problems` command (replaces `get alerts`; uses Zabbix `problem.get` API — the live active-problem list).
-- `get users` / `get user <id|username>` / `get usergroups` commands.
+- `get users` / `get user <id|username>` / `get usergroups` commands (opportunistic addition; not in original Phase 1 spec — added to PHASES.md retroactively).
 - `--limit`, `--sort-by FIELD[:desc]`, `--filter KEY=VALUE` flags on all collection commands.
 - `--explain` global flag: dumps JSON-RPC requests to stderr for debugging and agent transparency.
 - `zabctl completions bash|zsh|fish` — prints shell completion activation line.
@@ -43,6 +48,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - VS Code workspace config: extensions.json, settings.json, launch.json.
 - Docker Compose stack: postgres:16, zabbix-server-pgsql:alpine-7.0-latest, zabbix-web-nginx-pgsql:alpine-7.0-latest, zabbix-agent2:alpine-7.0-latest.
 
-[Unreleased]: https://github.com/mwtrigg/zabctl/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/mwtrigg/zabctl/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/mwtrigg/zabctl/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/mwtrigg/zabctl/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/mwtrigg/zabctl/releases/tag/v0.1.0

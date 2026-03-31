@@ -14,6 +14,7 @@ from typing import Any
 
 import yaml
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 console = Console()
@@ -144,7 +145,7 @@ def _format_table(
         table.add_column(col)
 
     for record in data:
-        row = [str(_extract_field(record, col) or "") for col in active_columns]
+        row = [escape(str(_extract_field(record, col) or "")) for col in active_columns]
         table.add_row(*row)
 
     console.print(table)
