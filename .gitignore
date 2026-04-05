@@ -1,22 +1,53 @@
 # Agent meta — lives in apostils/atelier, not here
 .author
 
-# Secrets — never committed
+# Claude Code — local permission grants (machine-specific)
+.claude/settings.local.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+wheels/
+
+# uv
+.venv/
+.uv/
+uv.lock.bak
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Type checking
+.mypy_cache/
+
+# Linting
+.ruff_cache/
+
+# Secrets and local config — NEVER commit these
 .env
-.env.*
-!.env.example
+docker/.env
 *.pem
 *.key
-*.p12
-*.pfx
-secrets/
+*.crt
 
-# Runtime artifacts
-logs/
-__pycache__/
-*.pyc
-.venv/
-venv/
-node_modules/
+# VS Code — settings.json and launch.json ARE committed (team defaults)
+# extensions.json IS committed (prompts teammates to install)
+.vscode/local.*.json
+
+# OS
 .DS_Store
-*.log
+Thumbs.db
+
+# Distribution artifacts
+*.whl
+*.tar.gz
