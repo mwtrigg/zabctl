@@ -1,52 +1,22 @@
-# Python
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-*.egg
-*.egg-info/
-dist/
-build/
-.eggs/
-wheels/
+# Agent meta — lives in apostils/atelier, not here
+.author
 
-# uv
-.venv/
-.uv/
-uv.lock.bak
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-coverage.xml
-
-# Type checking
-.mypy_cache/
-
-# Linting
-.ruff_cache/
-
-# Secrets and local config — NEVER commit these
+# Secrets — never committed
 .env
-docker/.env
+.env.*
+!.env.example
 *.pem
 *.key
-*.crt
+*.p12
+*.pfx
+secrets/
 
-# VS Code — settings.json and launch.json ARE committed (team defaults)
-# extensions.json IS committed (prompts teammates to install)
-.vscode/local.*.json
-
-# Claude Code — local permission grants (machine-specific)
-.claude/settings.local.json
-
-# OS
+# Runtime artifacts
+logs/
+__pycache__/
+*.pyc
+.venv/
+venv/
+node_modules/
 .DS_Store
-Thumbs.db
-
-# Distribution artifacts
-*.whl
-*.tar.gz
-.trigg/
-.gitignore
+*.log
