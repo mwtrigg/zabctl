@@ -16,6 +16,7 @@ import yaml
 from rich.console import Console
 from rich.markup import escape
 from rich.table import Table
+from rich.text import Text
 
 console = Console()
 err_console = Console(stderr=True)
@@ -56,6 +57,7 @@ def format_output(
     wide_columns: list[str] | None = None,
     no_headers: bool = False,
     field: str | None = None,
+    cell_styles: dict[str, dict[str, str]] | None = None,
 ) -> None:
     """
     Format and print data to stdout.
@@ -114,6 +116,7 @@ def format_output(
             columns=columns or [],
             wide_columns=wide_columns or [],
             no_headers=no_headers,
+            cell_styles=cell_styles,
         )
 
     else:
@@ -132,6 +135,7 @@ def _format_table(
     columns: list[str],
     wide_columns: list[str],
     no_headers: bool,
+    cell_styles: dict[str, dict[str, str]] | None = None,
 ) -> None:
     active_columns = list(columns)
     if output_format == "wide" and wide_columns:
@@ -145,7 +149,19 @@ def _format_table(
         table.add_column(col)
 
     for record in data:
-        row = [escape(str(_extract_field(record, col) or "")) for col in active_columns]
+        row: list[str | Text] = []
+        for col in active_columns:
+            raw = _extract_field(record, col)
+            val = str(raw) if raw is not None else ""
+            if cell_styles and col in cell_styles:
+                style = cell_styles[col].get(val)
+                if style:
+                    cell = Text(val, style=style)
+                else:
+                    cell = escape(val)
+            else:
+                cell = escape(val)
+            row.append(cell)
         table.add_row(*row)
 
     console.print(table)

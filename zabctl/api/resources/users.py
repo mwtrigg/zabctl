@@ -27,6 +27,7 @@ def get_users(
     params: dict[str, Any] = {
         "output": _USER_OUTPUT,
         "selectUsrgrps": ["usrgrpid", "name"],
+        "selectRole": ["roleid", "name"],
         "sortfield": "username",
         "sortorder": "ASC",
     }

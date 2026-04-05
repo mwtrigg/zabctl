@@ -3,7 +3,7 @@ zabctl auth commands.
 
 auth login   — acquire and store a session token
 auth logout  — invalidate current session token
-auth status  — show current auth state
+auth status  — show current auth state (supports --output json/jsonl/yaml/table)
 """
 
 from __future__ import annotations
@@ -12,8 +12,9 @@ import click
 import httpx
 
 from zabctl.api.client import ZabbixAPIError, ZabbixAuthError, ZabbixClient
+from zabctl.cli._common import _resolve_output
 from zabctl.config.loader import ZabctlConfig
-from zabctl.output.formatter import format_error
+from zabctl.output.formatter import format_error, format_output
 
 
 @click.group()
@@ -82,28 +83,61 @@ def auth_logout(cfg: ZabctlConfig) -> None:
 
 
 @auth.command("status")
+@click.option("--output", "-o", default=None, type=click.Choice(["table", "json", "jsonl", "yaml", "wide"]), help="Output format.")
 @click.pass_obj
-def auth_status(cfg: ZabctlConfig) -> None:
+def auth_status(cfg: ZabctlConfig, output: str | None) -> None:
     """Show current authentication status."""
-    server = cfg.server or "(not configured)"
+    fmt = _resolve_output(cfg.output, output)
     has_token = bool(cfg.api_token)
     has_creds = bool(cfg.username)
+    auth_via = "token" if has_token else "username/password" if has_creds else "none"
 
-    click.echo(f"server:    {server}")
-    click.echo(f"api_token: {'set' if has_token else 'not set'}")
-    click.echo(f"username:  {cfg.username or 'not set'}")
-    click.echo(f"auth_via:  {'token' if has_token else 'username/password' if has_creds else 'none'}")
-    click.echo(f"context:   {cfg.context_name or 'default'}")
-    click.echo(f"output:    {cfg.output}")
-    click.echo(f"insecure:  {cfg.tls.insecure}")
+    record: dict[str, object] = {
+        "server": cfg.server or "",
+        "api_token": "set" if has_token else "not set",
+        "username": cfg.username or "",
+        "auth_via": auth_via,
+        "context": cfg.context_name or "default",
+        "output": cfg.output,
+        "insecure": cfg.tls.insecure,
+        "connected": None,
+        "api_version": None,
+    }
 
     # Live connectivity check if we have enough config.
     if cfg.server and (has_token or has_creds):
         client = ZabbixClient(cfg)
         try:
             client.login()
-            click.echo(f"connected: yes (api_version: {client.api_version})")
+            record["connected"] = True
+            record["api_version"] = client.api_version
         except ZabbixAuthError:
-            click.echo("connected: auth failed", err=True)
+            record["connected"] = False
+            record["api_version"] = "auth failed"
         except (httpx.ConnectError, httpx.TimeoutException):
-            click.echo("connected: no (connection failed)", err=True)
+            record["connected"] = False
+            record["api_version"] = "connection failed"
+
+    if fmt in ("json", "jsonl", "yaml"):
+        format_output(
+            data=[record],
+            output_format=fmt,
+            command="auth status",
+            server=cfg.server,
+            columns=list(record.keys()),
+        )
+    else:
+        # Human-readable table/wide — print as key: value lines for readability.
+        click.echo(f"server:      {record['server'] or '(not configured)'}")
+        click.echo(f"api_token:   {record['api_token']}")
+        click.echo(f"username:    {record['username'] or 'not set'}")
+        click.echo(f"auth_via:    {record['auth_via']}")
+        click.echo(f"context:     {record['context']}")
+        click.echo(f"output:      {record['output']}")
+        click.echo(f"insecure:    {record['insecure']}")
+        if record["connected"] is True:
+            click.echo(f"connected:   yes (api_version: {record['api_version']})")
+        elif record["connected"] is False:
+            click.echo(f"connected:   no ({record['api_version']})", err=True)
+        else:
+            click.echo("connected:   (no credentials to test)")
