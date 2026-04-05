@@ -99,6 +99,19 @@ def get() -> None:
     """Retrieve resources from Zabbix."""
 
 
+# Severity color map for table output.
+# Keys are Zabbix numeric severity strings (priority / severity field values).
+# Must not affect json/jsonl/yaml output — only applied in _format_table.
+_SEVERITY_STYLES: dict[str, str] = {
+    "0": "dim",           # Not classified
+    "1": "cyan",          # Information
+    "2": "blue",          # Warning
+    "3": "yellow",        # Average
+    "4": "bright_red",    # High
+    "5": "bold red",      # Disaster
+}
+
+
 # ---------------------------------------------------------------------------
 # get hosts
 # ---------------------------------------------------------------------------
@@ -167,21 +180,28 @@ def get_hosts(
 # ---------------------------------------------------------------------------
 
 @get.command("host")
-@click.argument("id_or_name")
+@click.argument("id_or_name", required=False)
+@click.option("--from-stdin", is_flag=True, default=False, help="Read host ids/names from stdin (one per line).")
 @click.option("--output", "-o", default=None, type=click.Choice(["table", "json", "jsonl", "yaml", "wide"]), help="Output format.")
 @click.option("--no-headers", is_flag=True, default=False, help="Suppress table headers.")
 @click.pass_obj
-def get_host(cfg: ZabctlConfig, id_or_name: str, output: str | None, no_headers: bool) -> None:
-    """Show a single Zabbix host by id or name."""
+def get_host(cfg: ZabctlConfig, id_or_name: str | None, from_stdin: bool, output: str | None, no_headers: bool) -> None:
+    """Show a single Zabbix host by id or name. Accepts multiple ids/names via stdin."""
+    ids = _fan_out_ids(id_or_name, from_stdin)
+    if not ids:
+        format_error("Provide an id/name argument or pipe ids via stdin (--from-stdin)", exit_code=5)
+        return
     fmt = _resolve_output(cfg.output, output)
     client = _make_client(cfg)
-    try:
-        data = hosts.get_host(client, id_or_name)
-    except Exception as exc:
-        _handle_api_error(exc)
-        return
+    all_data: list[dict[str, Any]] = []
+    for id_or_n in ids:
+        try:
+            all_data.append(hosts.get_host(client, id_or_n))
+        except Exception as exc:
+            _handle_api_error(exc)
+            return
     format_output(
-        data=[data],
+        data=all_data,
         output_format=fmt,
         command="get host",
         server=cfg.server,
@@ -331,6 +351,7 @@ def get_triggers(
         wide_columns=["triggerid", "hosts[0].host"],
         no_headers=no_headers,
         field=field,
+        cell_styles={"priority": _SEVERITY_STYLES},
     )
 
 
@@ -398,6 +419,7 @@ def get_problems(
         wide_columns=["objectid", "r_eventid"],
         no_headers=no_headers,
         field=field,
+        cell_styles={"severity": _SEVERITY_STYLES},
     )
 
 
@@ -457,26 +479,34 @@ def get_templates(
 # ---------------------------------------------------------------------------
 
 @get.command("template")
-@click.argument("id_or_name")
+@click.argument("id_or_name", required=False)
+@click.option("--from-stdin", is_flag=True, default=False, help="Read template ids/names from stdin (one per line).")
 @click.option("--output", "-o", default=None, type=click.Choice(["table", "json", "jsonl", "yaml", "wide"]), help="Output format.")
 @click.option("--no-headers", is_flag=True, default=False, help="Suppress table headers.")
 @click.pass_obj
-def get_template(cfg: ZabctlConfig, id_or_name: str, output: str | None, no_headers: bool) -> None:
-    """Show a single template by id or name."""
+def get_template(cfg: ZabctlConfig, id_or_name: str | None, from_stdin: bool, output: str | None, no_headers: bool) -> None:
+    """Show a single template by id or name. Accepts multiple ids/names via stdin."""
+    ids = _fan_out_ids(id_or_name, from_stdin)
+    if not ids:
+        format_error("Provide an id/name argument or pipe ids via stdin (--from-stdin)", exit_code=5)
+        return
     fmt = _resolve_output(cfg.output, output)
     client = _make_client(cfg)
-    try:
-        data = templates.get_template(client, id_or_name)
-    except Exception as exc:
-        _handle_api_error(exc)
-        return
+    all_data: list[dict[str, Any]] = []
+    for id_or_n in ids:
+        try:
+            all_data.append(templates.get_template(client, id_or_n))
+        except Exception as exc:
+            _handle_api_error(exc)
+            return
     format_output(
-        data=[data],
+        data=all_data,
         output_format=fmt,
         command="get template",
         server=cfg.server,
         api_version=client.api_version,
-        columns=["templateid", "name", "description"],
+        columns=["templateid", "name", "description", "items_count", "triggers_count", "graphs_count"],
+        wide_columns=["items[0].name", "triggers[0].description"],
         no_headers=no_headers,
     )
 
@@ -678,7 +708,7 @@ def get_users(
         server=cfg.server,
         api_version=client.api_version,
         columns=["userid", "username", "name", "surname"],
-        wide_columns=["roleid", "usrgrps[0].name"],
+        wide_columns=["role[0].name", "usrgrps[0].name"],
         no_headers=no_headers,
         field=field,
     )
@@ -689,27 +719,34 @@ def get_users(
 # ---------------------------------------------------------------------------
 
 @get.command("user")
-@click.argument("id_or_name")
+@click.argument("id_or_name", required=False)
+@click.option("--from-stdin", is_flag=True, default=False, help="Read user ids/usernames from stdin (one per line).")
 @click.option("--output", "-o", default=None, type=click.Choice(["table", "json", "jsonl", "yaml", "wide"]), help="Output format.")
 @click.option("--no-headers", is_flag=True, default=False, help="Suppress table headers.")
 @click.pass_obj
-def get_user(cfg: ZabctlConfig, id_or_name: str, output: str | None, no_headers: bool) -> None:
-    """Show a single Zabbix user by id or username."""
+def get_user(cfg: ZabctlConfig, id_or_name: str | None, from_stdin: bool, output: str | None, no_headers: bool) -> None:
+    """Show a single Zabbix user by id or username. Accepts multiple ids/names via stdin."""
+    ids = _fan_out_ids(id_or_name, from_stdin)
+    if not ids:
+        format_error("Provide an id/username argument or pipe ids via stdin (--from-stdin)", exit_code=5)
+        return
     fmt = _resolve_output(cfg.output, output)
     client = _make_client(cfg)
-    try:
-        data = users.get_user(client, id_or_name)
-    except Exception as exc:
-        _handle_api_error(exc)
-        return
+    all_data: list[dict[str, Any]] = []
+    for id_or_n in ids:
+        try:
+            all_data.append(users.get_user(client, id_or_n))
+        except Exception as exc:
+            _handle_api_error(exc)
+            return
     format_output(
-        data=[data],
+        data=all_data,
         output_format=fmt,
         command="get user",
         server=cfg.server,
         api_version=client.api_version,
-        columns=["userid", "username", "name", "surname", "roleid"],
-        wide_columns=["usrgrps[0].name"],
+        columns=["userid", "username", "name", "surname"],
+        wide_columns=["role[0].name", "usrgrps[0].name"],
         no_headers=no_headers,
     )
 
@@ -778,4 +815,18 @@ def _fan_out_hosts(
             return lines
     if host_arg:
         return [host_arg]
+    return []
+
+
+def _fan_out_ids(
+    id_or_name_arg: str | None,
+    from_stdin: bool,
+) -> list[str]:
+    """Return a list of IDs/names from the CLI arg or from stdin (one per line)."""
+    if from_stdin or not sys.stdin.isatty():
+        lines = _read_stdin_lines(from_stdin=True)
+        if lines:
+            return lines
+    if id_or_name_arg:
+        return [id_or_name_arg]
     return []

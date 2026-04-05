@@ -6,7 +6,7 @@ Idempotent: safe to run multiple times. Uses only stdlib (no httpx/requests).
 
 Usage:
     python docker/seed.py
-    python docker/seed.py --url http://localhost:8080 --user Admin --password zabbix
+    python docker/seed.py --url http://localhost:8081 --user Admin --password zabbix
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-DEFAULT_URL = "http://localhost:8080/api_jsonrpc.php"
+DEFAULT_URL = "http://localhost:8081/api_jsonrpc.php"
 DEFAULT_USER = "Admin"
 DEFAULT_PASSWORD = "zabbix"
 
