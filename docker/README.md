@@ -22,7 +22,7 @@ The script is idempotent — safe to run multiple times. It will print `[created
 Override connection details if needed:
 
 ```bash
-python docker/seed.py --url http://localhost:8080/api_jsonrpc.php \
+python docker/seed.py --url http://localhost:8081/api_jsonrpc.php \
                       --user Admin \
                       --password zabbix
 ```
@@ -31,8 +31,8 @@ python docker/seed.py --url http://localhost:8080/api_jsonrpc.php \
 
 | Field    | Value                               |
 |----------|-------------------------------------|
-| URL      | http://localhost:8080               |
-| API URL  | http://localhost:8080/api_jsonrpc.php |
+| URL      | http://localhost:8081               |
+| API URL  | http://localhost:8081/api_jsonrpc.php |
 | Username | Admin                               |
 | Password | zabbix                              |
 
