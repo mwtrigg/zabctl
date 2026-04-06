@@ -6,6 +6,8 @@ from typing import Any
 
 from zabctl.api.client import ZabbixClient, ZabbixNotFoundError
 
+_PROTECTED_USERNAMES = {"Admin"}
+
 _USER_OUTPUT = ["userid", "username", "name", "surname", "roleid"]
 
 
@@ -67,3 +69,41 @@ def get_user(
     if not result:
         raise ZabbixNotFoundError(f"User not found: {user_id_or_name!r}")
     return result[0]
+
+
+def get_role_by_name(client: ZabbixClient, name_or_id: str) -> dict[str, Any]:
+    """Resolve a role name or numeric ID to a role dict."""
+    params: dict[str, Any] = {"output": ["roleid", "name"]}
+    if name_or_id.isdigit():
+        params["roleids"] = [name_or_id]
+    else:
+        params["filter"] = {"name": name_or_id}
+    result: list[dict[str, Any]] = client.call("role.get", params)
+    if not result:
+        raise ZabbixNotFoundError(f"Role not found: {name_or_id!r}")
+    return result[0]
+
+
+def create_user(
+    client: ZabbixClient,
+    *,
+    username: str,
+    password: str,
+    roleid: str,
+    group_ids: list[str],
+) -> dict[str, Any]:
+    """Create a new Zabbix user. Returns the API result dict with userids."""
+    params: dict[str, Any] = {
+        "username": username,
+        "passwd": password,
+        "roleid": roleid,
+        "usrgrps": [{"usrgrpid": gid} for gid in group_ids],
+    }
+    result: dict[str, Any] = client.call("user.create", params)
+    return result
+
+
+def delete_user(client: ZabbixClient, userid: str) -> dict[str, Any]:
+    """Delete a user by numeric userid. Returns the API result dict with userids."""
+    result: dict[str, Any] = client.call("user.delete", [userid])
+    return result

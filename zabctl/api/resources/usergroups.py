@@ -49,3 +49,40 @@ def get_usergroups(
 
     result: list[dict[str, Any]] = client.call("usergroup.get", params)
     return result
+
+
+def get_usergroup(client: ZabbixClient, id_or_name: str) -> dict[str, Any]:
+    """Return a single usergroup by usrgrpid or name."""
+    params: dict[str, Any] = {"output": _USERGROUP_OUTPUT}
+    if id_or_name.isdigit():
+        params["usrgrpids"] = [id_or_name]
+    else:
+        params["filter"] = {"name": id_or_name}
+    result: list[dict[str, Any]] = client.call("usergroup.get", params)
+    if not result:
+        from zabctl.api.client import ZabbixNotFoundError
+        raise ZabbixNotFoundError(f"User group not found: {id_or_name!r}")
+    return result[0]
+
+
+def create_usergroup(
+    client: ZabbixClient,
+    *,
+    name: str,
+    gui_access: int = 0,
+    users_status: int = 0,
+) -> dict[str, Any]:
+    """Create a user group. Returns the API result dict with usrgrpids."""
+    params: dict[str, Any] = {
+        "name": name,
+        "gui_access": gui_access,
+        "users_status": users_status,
+    }
+    result: dict[str, Any] = client.call("usergroup.create", params)
+    return result
+
+
+def delete_usergroup(client: ZabbixClient, usrgrpid: str) -> dict[str, Any]:
+    """Delete a usergroup by numeric usrgrpid. Returns the API result dict with usrgrpids."""
+    result: dict[str, Any] = client.call("usergroup.delete", [usrgrpid])
+    return result

@@ -167,6 +167,26 @@ class ZabbixClient:
         """
         return self._send(method, params, auth=self._session_token)
 
+    def current_user_info(self) -> dict[str, Any] | None:
+        """Return info about the currently authenticated user, or None if not determinable.
+
+        Uses user.checkAuthentication with the active session token.
+        Returns None for API token auth where this call is unsupported.
+        """
+        if not self._session_token:
+            return None
+        try:
+            result = self._send(
+                "user.checkAuthentication",
+                {"token": self._session_token},
+                auth=self._session_token,
+            )
+            if isinstance(result, dict):
+                return result
+        except Exception:
+            pass
+        return None
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------

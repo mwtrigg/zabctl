@@ -13,7 +13,7 @@ from typing import Any
 import click
 import yaml
 
-from zabctl.api.resources import events, hosts, maintenance, triggers
+from zabctl.api.resources import events, hosts, maintenance, triggers, usergroups, users
 from zabctl.api.utils import parse_time
 from zabctl.cli._common import _handle_api_error, _make_client, _resolve_output
 from zabctl.config.loader import ZabctlConfig
@@ -369,6 +369,128 @@ def create_host(
     _write_output(result, fmt=fmt, command="create host", cfg=cfg, client=client, columns=["hostids"])
 
 
+@create_group.command("user")
+@click.option("--username", required=True, help="Login username.")
+@click.option("--password", required=True, hide_input=True, help="Initial password.")
+@click.option("--role", "role_name", required=True, help="Role name or numeric roleid.")
+@click.option("--group", "group_names", multiple=True, required=True, help="User group name(s) (repeatable).")
+@click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation prompt.")
+@click.option("--output", "-o", default=None, type=click.Choice(["table", "json", "jsonl", "yaml", "wide"]))
+@click.pass_obj
+def create_user(
+    cfg: ZabctlConfig,
+    username: str,
+    password: str,
+    role_name: str,
+    group_names: tuple[str, ...],
+    yes: bool,
+    output: str | None,
+) -> None:
+    """Create a Zabbix user.
+
+    \b
+    Examples:
+      zabctl create user --username alice --password s3cr3t --role "Zabbix User" --group "Linux Team"
+      zabctl create user --username bob --password s3cr3t --role 1 --group "Zabbix administrators" --yes
+    """
+    if username in users._PROTECTED_USERNAMES:
+        click.echo(f"error: cannot create user with protected username {username!r}", err=True)
+        raise SystemExit(5)
+
+    fmt = _resolve_output(cfg.output, output)
+
+    if not yes:
+        click.confirm(f"Create user {username!r} with role {role_name!r} in groups {list(group_names)}?", abort=True)
+
+    client = _make_client(cfg)
+
+    # Resolve role name → id.
+    try:
+        role = users.get_role_by_name(client, role_name)
+    except Exception as exc:
+        _handle_api_error(exc)
+        return
+
+    # Resolve group names → ids.
+    group_ids: list[str] = []
+    for gname in group_names:
+        try:
+            grp = usergroups.get_usergroup(client, gname)
+            group_ids.append(grp["usrgrpid"])
+        except Exception as exc:
+            _handle_api_error(exc)
+            return
+
+    try:
+        result = users.create_user(
+            client,
+            username=username,
+            password=password,
+            roleid=role["roleid"],
+            group_ids=group_ids,
+        )
+    except Exception as exc:
+        _handle_api_error(exc)
+        return
+
+    click.echo(f"created user {username!r} → userids: {result.get('userids')}", err=True)
+    _write_output(result, fmt=fmt, command="create user", cfg=cfg, client=client, columns=["userids"])
+
+
+@create_group.command("usergroup")
+@click.option("--name", required=True, help="User group name.")
+@click.option(
+    "--gui-access",
+    "gui_access",
+    default="default",
+    show_default=True,
+    type=click.Choice(["default", "internal", "ldap", "disable"]),
+    help="Frontend access method.",
+)
+@click.option("--disabled", is_flag=True, default=False, help="Create the group in disabled state.")
+@click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation prompt.")
+@click.option("--output", "-o", default=None, type=click.Choice(["table", "json", "jsonl", "yaml", "wide"]))
+@click.pass_obj
+def create_usergroup(
+    cfg: ZabctlConfig,
+    name: str,
+    gui_access: str,
+    disabled: bool,
+    yes: bool,
+    output: str | None,
+) -> None:
+    """Create a Zabbix user group.
+
+    \b
+    Examples:
+      zabctl create usergroup --name "Linux Team"
+      zabctl create usergroup --name "Read-Only" --gui-access internal --disabled
+    """
+    _GUI_ACCESS_MAP = {"default": 0, "internal": 1, "ldap": 2, "disable": 3}
+    gui_access_val = _GUI_ACCESS_MAP[gui_access]
+    users_status_val = 1 if disabled else 0
+
+    fmt = _resolve_output(cfg.output, output)
+
+    if not yes:
+        click.confirm(f"Create user group {name!r}?", abort=True)
+
+    client = _make_client(cfg)
+    try:
+        result = usergroups.create_usergroup(
+            client,
+            name=name,
+            gui_access=gui_access_val,
+            users_status=users_status_val,
+        )
+    except Exception as exc:
+        _handle_api_error(exc)
+        return
+
+    click.echo(f"created usergroup {name!r} → usrgrpids: {result.get('usrgrpids')}", err=True)
+    _write_output(result, fmt=fmt, command="create usergroup", cfg=cfg, client=client, columns=["usrgrpids"])
+
+
 # ---------------------------------------------------------------------------
 # zabctl tag / untag
 # ---------------------------------------------------------------------------
@@ -463,3 +585,92 @@ def delete_host(cfg: ZabctlConfig, id_or_name: str, yes: bool, output: str | Non
         return
     click.echo(f"deleted host {id_or_name!r} → hostids: {result.get('hostids')}", err=True)
     _write_output(result, fmt=fmt, command="delete host", cfg=cfg, client=client, columns=["hostids"])
+
+
+@delete_group.command("user")
+@click.argument("id_or_name")
+@click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation prompt.")
+@click.option("--output", "-o", default=None, type=click.Choice(["table", "json", "jsonl", "yaml", "wide"]))
+@click.pass_obj
+def delete_user(cfg: ZabctlConfig, id_or_name: str, yes: bool, output: str | None) -> None:
+    """Delete a user by userid or username. Prompts for confirmation unless --yes is given."""
+    fmt = _resolve_output(cfg.output, output)
+    client = _make_client(cfg)
+
+    # Resolve user first so we can show the username in the prompt and run hardblock checks.
+    try:
+        user_record = users.get_user(client, id_or_name)
+    except Exception as exc:
+        _handle_api_error(exc)
+        return
+
+    target_username = user_record.get("username", "")
+
+    # Hardblock: never delete Admin.
+    if target_username in users._PROTECTED_USERNAMES:
+        click.echo(f"error: {target_username!r} is a protected account and cannot be deleted", err=True)
+        raise SystemExit(5)
+
+    # Hardblock: never delete the token-owner.
+    current = client.current_user_info()
+    if current and current.get("username") == target_username:
+        click.echo(f"error: cannot delete the currently authenticated user {target_username!r}", err=True)
+        raise SystemExit(5)
+
+    if not yes:
+        click.confirm(f"Delete user {target_username!r} (userid={user_record['userid']})? This cannot be undone.", abort=True)
+
+    try:
+        result = users.delete_user(client, user_record["userid"])
+    except Exception as exc:
+        _handle_api_error(exc)
+        return
+
+    click.echo(f"deleted user {target_username!r} → userids: {result.get('userids') or result}", err=True)
+    _write_output(
+        {"userids": result} if isinstance(result, list) else result,
+        fmt=fmt,
+        command="delete user",
+        cfg=cfg,
+        client=client,
+        columns=["userids"],
+    )
+
+
+@delete_group.command("usergroup")
+@click.argument("id_or_name")
+@click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation prompt.")
+@click.option("--output", "-o", default=None, type=click.Choice(["table", "json", "jsonl", "yaml", "wide"]))
+@click.pass_obj
+def delete_usergroup(cfg: ZabctlConfig, id_or_name: str, yes: bool, output: str | None) -> None:
+    """Delete a user group by id or name. Prompts for confirmation unless --yes is given."""
+    fmt = _resolve_output(cfg.output, output)
+    client = _make_client(cfg)
+
+    # Resolve group first so we can show the name in the confirmation prompt.
+    try:
+        group_record = usergroups.get_usergroup(client, id_or_name)
+    except Exception as exc:
+        _handle_api_error(exc)
+        return
+
+    group_name = group_record.get("name", id_or_name)
+
+    if not yes:
+        click.confirm(f"Delete user group {group_name!r} (usrgrpid={group_record['usrgrpid']})? This cannot be undone.", abort=True)
+
+    try:
+        result = usergroups.delete_usergroup(client, group_record["usrgrpid"])
+    except Exception as exc:
+        _handle_api_error(exc)
+        return
+
+    click.echo(f"deleted usergroup {group_name!r} → usrgrpids: {result.get('usrgrpids') or result}", err=True)
+    _write_output(
+        {"usrgrpids": result} if isinstance(result, list) else result,
+        fmt=fmt,
+        command="delete usergroup",
+        cfg=cfg,
+        client=client,
+        columns=["usrgrpids"],
+    )
