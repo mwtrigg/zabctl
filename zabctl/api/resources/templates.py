@@ -49,11 +49,14 @@ def get_template(
     client: ZabbixClient,
     template_id_or_name: str,
 ) -> dict[str, Any]:
-    """Return a single template by id or name."""
+    """Return a single template by id or name, including items, triggers, and graphs."""
     params: dict[str, Any] = {
         "output": _TEMPLATE_OUTPUT,
         "selectGroups": ["groupid", "name"],
         "selectHosts": ["hostid", "host", "name"],
+        "selectItems": ["itemid", "name", "key_"],
+        "selectTriggers": ["triggerid", "description", "priority"],
+        "selectGraphs": ["graphid", "name"],
     }
 
     if template_id_or_name.isdigit():
@@ -64,4 +67,10 @@ def get_template(
     result: list[dict[str, Any]] = client.call("template.get", params)
     if not result:
         raise ZabbixNotFoundError(f"Template not found: {template_id_or_name!r}")
-    return result[0]
+
+    # Add computed count fields for convenient table display.
+    record = result[0]
+    record["items_count"] = len(record.get("items") or [])
+    record["triggers_count"] = len(record.get("triggers") or [])
+    record["graphs_count"] = len(record.get("graphs") or [])
+    return record
