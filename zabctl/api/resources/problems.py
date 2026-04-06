@@ -52,7 +52,7 @@ def get_alerts(
         params["time_from"] = parse_time(since)
 
     if acknowledged is not None:
-        params["acknowledged"] = 1 if acknowledged else 0
+        params["acknowledged"] = bool(acknowledged)
 
     if limit is not None:
         params["limit"] = limit
