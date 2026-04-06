@@ -708,7 +708,7 @@ def get_users(
         server=cfg.server,
         api_version=client.api_version,
         columns=["userid", "username", "name", "surname"],
-        wide_columns=["role[0].name", "usrgrps[0].name"],
+        wide_columns=["role.name", "usrgrps[0].name"],
         no_headers=no_headers,
         field=field,
     )
@@ -746,7 +746,7 @@ def get_user(cfg: ZabctlConfig, id_or_name: str | None, from_stdin: bool, output
         server=cfg.server,
         api_version=client.api_version,
         columns=["userid", "username", "name", "surname"],
-        wide_columns=["role[0].name", "usrgrps[0].name"],
+        wide_columns=["role.name", "usrgrps[0].name"],
         no_headers=no_headers,
     )
 
