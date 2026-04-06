@@ -61,7 +61,8 @@ def get_hosts(
         params["sortorder"] = order
 
     if extra_params:
-        params.update(extra_params)
+        existing = params.get("filter", {})
+        params["filter"] = {**existing, **extra_params}
 
     result: list[dict[str, Any]] = client.call("host.get", params)
     return result

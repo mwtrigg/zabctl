@@ -194,21 +194,25 @@ def get_host(cfg: ZabctlConfig, id_or_name: str | None, from_stdin: bool, output
     fmt = _resolve_output(cfg.output, output)
     client = _make_client(cfg)
     all_data: list[dict[str, Any]] = []
+    error_exc: Exception | None = None
     for id_or_n in ids:
         try:
             all_data.append(hosts.get_host(client, id_or_n))
         except Exception as exc:
-            _handle_api_error(exc)
-            return
-    format_output(
-        data=all_data,
-        output_format=fmt,
-        command="get host",
-        server=cfg.server,
-        api_version=client.api_version,
-        columns=["host", "name", "status", "interfaces[0].ip", "groups[0].name"],
-        no_headers=no_headers,
-    )
+            error_exc = exc
+            break
+    if all_data:
+        format_output(
+            data=all_data,
+            output_format=fmt,
+            command="get host",
+            server=cfg.server,
+            api_version=client.api_version,
+            columns=["host", "name", "status", "interfaces[0].ip", "groups[0].name"],
+            no_headers=no_headers,
+        )
+    if error_exc is not None:
+        _handle_api_error(error_exc)
 
 
 # ---------------------------------------------------------------------------
@@ -493,22 +497,26 @@ def get_template(cfg: ZabctlConfig, id_or_name: str | None, from_stdin: bool, ou
     fmt = _resolve_output(cfg.output, output)
     client = _make_client(cfg)
     all_data: list[dict[str, Any]] = []
+    error_exc: Exception | None = None
     for id_or_n in ids:
         try:
             all_data.append(templates.get_template(client, id_or_n))
         except Exception as exc:
-            _handle_api_error(exc)
-            return
-    format_output(
-        data=all_data,
-        output_format=fmt,
-        command="get template",
-        server=cfg.server,
-        api_version=client.api_version,
-        columns=["templateid", "name", "description", "items_count", "triggers_count", "graphs_count"],
-        wide_columns=["items[0].name", "triggers[0].description"],
-        no_headers=no_headers,
-    )
+            error_exc = exc
+            break
+    if all_data:
+        format_output(
+            data=all_data,
+            output_format=fmt,
+            command="get template",
+            server=cfg.server,
+            api_version=client.api_version,
+            columns=["templateid", "name", "description", "items_count", "triggers_count", "graphs_count"],
+            wide_columns=["items[0].name", "triggers[0].description"],
+            no_headers=no_headers,
+        )
+    if error_exc is not None:
+        _handle_api_error(error_exc)
 
 
 # ---------------------------------------------------------------------------
@@ -733,22 +741,26 @@ def get_user(cfg: ZabctlConfig, id_or_name: str | None, from_stdin: bool, output
     fmt = _resolve_output(cfg.output, output)
     client = _make_client(cfg)
     all_data: list[dict[str, Any]] = []
+    error_exc: Exception | None = None
     for id_or_n in ids:
         try:
             all_data.append(users.get_user(client, id_or_n))
         except Exception as exc:
-            _handle_api_error(exc)
-            return
-    format_output(
-        data=all_data,
-        output_format=fmt,
-        command="get user",
-        server=cfg.server,
-        api_version=client.api_version,
-        columns=["userid", "username", "name", "surname"],
-        wide_columns=["role.name", "usrgrps[0].name"],
-        no_headers=no_headers,
-    )
+            error_exc = exc
+            break
+    if all_data:
+        format_output(
+            data=all_data,
+            output_format=fmt,
+            command="get user",
+            server=cfg.server,
+            api_version=client.api_version,
+            columns=["userid", "username", "name", "surname"],
+            wide_columns=["role.name", "usrgrps[0].name"],
+            no_headers=no_headers,
+        )
+    if error_exc is not None:
+        _handle_api_error(error_exc)
 
 
 # ---------------------------------------------------------------------------
