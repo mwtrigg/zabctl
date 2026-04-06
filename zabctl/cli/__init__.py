@@ -19,6 +19,7 @@ from .auth import auth
 from .context import context
 from .get import get
 from .llm import llm
+from .template import template_group
 from .write import acknowledge, create_group, delete_group, disable, enable, maintenance_group, tag_group, untag_group
 
 
@@ -161,6 +162,7 @@ cli.add_command(auth)
 cli.add_command(context)
 cli.add_command(get)
 cli.add_command(llm)
+cli.add_command(template_group, name="template")
 cli.add_command(enable)
 cli.add_command(disable)
 cli.add_command(acknowledge)
