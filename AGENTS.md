@@ -1,0 +1,1 @@
+/home/mwt/src/mwtrigg/apostils/projects/AGENTS.md
